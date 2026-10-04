@@ -11,6 +11,7 @@ from application.order.dto import OrderFilterDto
 from application.order.repository import IOrderRepository
 from domain.order import Order, OrderStatus, ProductSnapshot
 from infrastructure.persistence.postgres.connection import get_postgres_pool
+from infrastructure.persistence.postgres.product_mapper import ProductSnapshotMapper
 
 
 class PostgresOrderRepository(IOrderRepository):
@@ -24,12 +25,12 @@ class PostgresOrderRepository(IOrderRepository):
         raw_snapshot = row.get("product_snapshot")
         snapshot = None
         if isinstance(raw_snapshot, dict) and raw_snapshot:
-            snapshot = ProductSnapshot.from_dict(raw_snapshot)
+            snapshot = ProductSnapshotMapper.from_dict(raw_snapshot)
         elif isinstance(raw_snapshot, str) and raw_snapshot and raw_snapshot != "{}":
             try:
                 parsed = json.loads(raw_snapshot)
                 if isinstance(parsed, dict) and parsed:
-                    snapshot = ProductSnapshot.from_dict(parsed)
+                    snapshot = ProductSnapshotMapper.from_dict(parsed)
             except (json.JSONDecodeError, ValueError, TypeError, KeyError):
                 snapshot = None
 
@@ -122,7 +123,9 @@ class PostgresOrderRepository(IOrderRepository):
 
     def save(self, order: Order) -> Order:
         snapshot_json = json.dumps(
-            order.product_snapshot.to_dict() if order.product_snapshot else {}
+            ProductSnapshotMapper.to_dict(order.product_snapshot)
+            if order.product_snapshot
+            else {}
         )
         with self._pool.connection() as conn, conn.cursor() as cur:
             cur.execute(

@@ -13,23 +13,6 @@ class ProductSnapshot:
     description: str
     price: Decimal
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "id": str(self.id),
-            "name": self.name,
-            "description": self.description,
-            "price": f"{self.price:.2f}",
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ProductSnapshot":
-        return cls(
-            id=UUID(str(data["id"])),
-            name=str(data.get("name", "")),
-            description=str(data.get("description", "")),
-            price=Decimal(str(data.get("price", "0.00"))),
-        )
-
     @classmethod
     def from_product(cls, product: Any) -> "ProductSnapshot":
         return cls(
