@@ -1,6 +1,11 @@
+import builtins
 from decimal import Decimal
 from uuid import UUID
 
+from application.attachment.dto import AttachmentResponseDto
+from application.attachment.service import AttachmentService
+from application.category.dto import CategoryResponseDto
+from application.category.service import CategoryService
 from domain.product import Product
 
 from .dto import (
@@ -22,8 +27,15 @@ from .repository import IProductRepository
 
 
 class ProductService:
-    def __init__(self, product_repository: IProductRepository) -> None:
+    def __init__(
+        self,
+        product_repository: IProductRepository,
+        category_service: CategoryService,
+        attachment_service: AttachmentService,
+    ) -> None:
         self._product_repository = product_repository
+        self._category_service = category_service
+        self._attachment_service = attachment_service
 
     def create(self, dto: ProductCreateDto) -> ProductResponseDto:
         if not dto.name.strip():
@@ -33,11 +45,19 @@ class ProductService:
         if dto.quantity < 0:
             raise NegativeProductQuantityException()
 
+        for cat_id in dto.category_ids:
+            self._category_service.ensure_exists(cat_id)
+
+        for att_id in dto.attachment_ids:
+            self._attachment_service.ensure_exists(att_id)
+
         product = Product(
             name=dto.name.strip(),
             description=dto.description.strip(),
             price=dto.price,
             quantity=dto.quantity,
+            category_ids=list(dto.category_ids),
+            attachment_ids=list(dto.attachment_ids),
         )
         saved_product = self._product_repository.save(product)
         return ProductResponseDto.from_domain(saved_product)
@@ -98,8 +118,97 @@ class ProductService:
                 raise NegativeProductQuantityException()
             product.quantity = dto.quantity
 
+        if dto.category_ids is not None:
+            for cat_id in dto.category_ids:
+                self._category_service.ensure_exists(cat_id)
+            product.category_ids = list(dto.category_ids)
+
+        if dto.attachment_ids is not None:
+            for att_id in dto.attachment_ids:
+                self._attachment_service.ensure_exists(att_id)
+            product.attachment_ids = list(dto.attachment_ids)
+
         saved_product = self._product_repository.save(product)
         return ProductResponseDto.from_domain(saved_product)
+
+    def add_category(self, product_id: UUID, category_id: UUID) -> ProductResponseDto:
+        product = self._product_repository.get_by_id(product_id)
+        if product is None:
+            raise ProductNotFoundException(product_id)
+
+        self._category_service.ensure_exists(category_id)
+
+        if category_id not in product.category_ids:
+            product.category_ids.append(category_id)
+            self._product_repository.save(product)
+
+        return ProductResponseDto.from_domain(product)
+
+    def remove_category(self, product_id: UUID, category_id: UUID) -> ProductResponseDto:
+        product = self._product_repository.get_by_id(product_id)
+        if product is None:
+            raise ProductNotFoundException(product_id)
+
+        if category_id in product.category_ids:
+            product.category_ids.remove(category_id)
+            self._product_repository.save(product)
+
+        return ProductResponseDto.from_domain(product)
+
+    def get_product_categories(self, product_id: UUID) -> builtins.list[CategoryResponseDto]:
+        product = self._product_repository.get_by_id(product_id)
+        if product is None:
+            raise ProductNotFoundException(product_id)
+
+        if not product.category_ids:
+            return []
+
+        categories_map = self._category_service.get_by_ids(product.category_ids)
+        return [
+            categories_map[cat_id]
+            for cat_id in product.category_ids
+            if cat_id in categories_map
+        ]
+
+    def add_attachment(self, product_id: UUID, attachment_id: UUID) -> ProductResponseDto:
+        product = self._product_repository.get_by_id(product_id)
+        if product is None:
+            raise ProductNotFoundException(product_id)
+
+        self._attachment_service.ensure_exists(attachment_id)
+
+        if attachment_id not in product.attachment_ids:
+            product.attachment_ids.append(attachment_id)
+            self._product_repository.save(product)
+
+        return ProductResponseDto.from_domain(product)
+
+    def remove_attachment(self, product_id: UUID, attachment_id: UUID) -> ProductResponseDto:
+        product = self._product_repository.get_by_id(product_id)
+        if product is None:
+            raise ProductNotFoundException(product_id)
+
+        if attachment_id in product.attachment_ids:
+            product.attachment_ids.remove(attachment_id)
+            self._product_repository.save(product)
+
+        return ProductResponseDto.from_domain(product)
+
+    def get_product_attachments(self, product_id: UUID) -> builtins.list[AttachmentResponseDto]:
+        product = self._product_repository.get_by_id(product_id)
+        if product is None:
+            raise ProductNotFoundException(product_id)
+
+        if not product.attachment_ids:
+            return []
+
+        attachments_map = self._attachment_service.get_by_ids(product.attachment_ids)
+        attachments = [
+            attachments_map[att_id]
+            for att_id in product.attachment_ids
+            if att_id in attachments_map
+        ]
+        return sorted(attachments, key=lambda a: a.order)
 
     def delete(self, product_id: UUID) -> bool:
         if not self._product_repository.delete(product_id):
