@@ -1,3 +1,4 @@
+from functools import cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -12,21 +13,20 @@ from infrastructure.persistence.postgres.product_repository import (
     PostgresProductRepository,
 )
 
-_product_repository: IProductRepository = PostgresProductRepository()
-_category_repository: ICategoryRepository = ICategoryRepository()
-_attachment_repository: IAttachmentRepository = IAttachmentRepository()
 
-
+@cache
 def get_product_repository() -> IProductRepository:
-    return _product_repository
+    return PostgresProductRepository()
 
 
+@cache
 def get_category_repository() -> ICategoryRepository:
-    return _category_repository
+    raise NotImplementedError("CouchDbCategoryRepository will be connected next")
 
 
+@cache
 def get_attachment_repository() -> IAttachmentRepository:
-    return _attachment_repository
+    raise NotImplementedError("CouchDbAttachmentRepository will be connected next")
 
 
 ProductRepositoryDep = Annotated[IProductRepository, Depends(get_product_repository)]

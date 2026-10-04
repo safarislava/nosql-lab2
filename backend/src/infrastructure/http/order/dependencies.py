@@ -1,3 +1,4 @@
+from functools import cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -14,16 +15,15 @@ from infrastructure.persistence.riak.order_counter_repository import (
     RiakOrderCounterRepository,
 )
 
-_order_repository: IOrderRepository = PostgresOrderRepository()
-_counter_repository: IOrderCounterRepository = RiakOrderCounterRepository()
 
-
+@cache
 def get_order_repository() -> IOrderRepository:
-    return _order_repository
+    return PostgresOrderRepository()
 
 
+@cache
 def get_counter_repository() -> IOrderCounterRepository:
-    return _counter_repository
+    return RiakOrderCounterRepository()
 
 
 OrderRepositoryDep = Annotated[IOrderRepository, Depends(get_order_repository)]

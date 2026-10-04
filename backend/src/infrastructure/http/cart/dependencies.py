@@ -1,3 +1,4 @@
+from functools import cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -8,11 +9,10 @@ from infrastructure.event_bus.dependencies import EventBusDep
 from infrastructure.http.product.dependencies import ProductServiceDep
 from infrastructure.persistence.riak.cart_repository import RiakCartRepository
 
-_cart_repository: ICartRepository = RiakCartRepository()
 
-
+@cache
 def get_cart_repository() -> ICartRepository:
-    return _cart_repository
+    return RiakCartRepository()
 
 
 CartRepositoryDep = Annotated[ICartRepository, Depends(get_cart_repository)]
