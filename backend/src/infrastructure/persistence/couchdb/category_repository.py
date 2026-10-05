@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class CouchDbCategoryRepository(ICategoryRepository):
     """Гранулярный CRUD-репозиторий категорий в CouchDB.
-    
+
     Категории хранятся непосредственно как встроенный массив `categories`
     внутри документа товара в базе `products`.
     """
@@ -39,9 +39,7 @@ class CouchDbCategoryRepository(ICategoryRepository):
         except Exception as exc:  # noqa: BLE001
             logger.warning("Не удалось инициализировать базу '%s': %s", self._db, exc)
 
-    def get_by_id(
-        self, product_id: UUID, category_id: UUID
-    ) -> Category | None:
+    def get_by_id(self, product_id: UUID, category_id: UUID) -> Category | None:
         """Получить встроенную категорию товара по ID."""
         doc = self._client.get_doc(self._db, str(product_id))
         if not doc or doc.get("type") != "product":
@@ -54,9 +52,7 @@ class CouchDbCategoryRepository(ICategoryRepository):
 
         return None
 
-    def list(
-        self, product_id: UUID
-    ) -> builtins.list[Category]:
+    def list(self, product_id: UUID) -> builtins.list[Category]:
         """Получить список всех встроенных категорий конкретного товара."""
         doc = self._client.get_doc(self._db, str(product_id))
         if not doc or doc.get("type") != "product":
@@ -68,9 +64,7 @@ class CouchDbCategoryRepository(ICategoryRepository):
             if isinstance(c, dict)
         ]
 
-    def add(
-        self, product_id: UUID, category: Category
-    ) -> Category:
+    def add(self, product_id: UUID, category: Category) -> Category:
         """Добавить категорию во встроенный массив товара."""
         cat_dict = CategoryCouchDbMapper.to_dict(category)
         cat_id_str = str(category.id)
@@ -90,9 +84,7 @@ class CouchDbCategoryRepository(ICategoryRepository):
             raise ProductNotFoundException(product_id)
         return category
 
-    def update(
-        self, product_id: UUID, category: Category
-    ) -> Category | None:
+    def update(self, product_id: UUID, category: Category) -> Category | None:
         """Обновить существующую встроенную категорию товара."""
         cat_dict = CategoryCouchDbMapper.to_dict(category)
         cat_id_str = str(category.id)
@@ -111,9 +103,7 @@ class CouchDbCategoryRepository(ICategoryRepository):
             return None
         return category
 
-    def delete(
-        self, product_id: UUID, category_id: UUID
-    ) -> bool:
+    def delete(self, product_id: UUID, category_id: UUID) -> bool:
         """Удалить встроенную категорию из товара по ID."""
         cat_id_str = str(category_id)
 
@@ -122,7 +112,8 @@ class CouchDbCategoryRepository(ICategoryRepository):
                 return False
             cats = doc.get("categories", [])
             new_cats = [
-                c for c in cats
+                c
+                for c in cats
                 if not (isinstance(c, dict) and c.get("id") == cat_id_str)
             ]
             if len(new_cats) == len(cats):

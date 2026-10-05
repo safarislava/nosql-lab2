@@ -35,9 +35,7 @@ class CategoryService:
         saved = self._category_repository.add(product_id, category)
         return CategoryResponseDto.from_domain(saved)
 
-    def get_by_id(
-        self, product_id: UUID, category_id: UUID
-    ) -> CategoryResponseDto:
+    def get_by_id(self, product_id: UUID, category_id: UUID) -> CategoryResponseDto:
         category = self._category_repository.get_by_id(product_id, category_id)
         if category is None:
             raise CategoryNotFoundException(category_id)

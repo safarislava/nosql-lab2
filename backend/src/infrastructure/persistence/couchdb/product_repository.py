@@ -44,7 +44,9 @@ class CouchDbProductRepository(IProductRepository):
         try:
             self._client.ensure_database(self._db)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Не удалось проверить или создать базу '%s': %s", self._db, exc)
+            logger.warning(
+                "Не удалось проверить или создать базу '%s': %s", self._db, exc
+            )
 
     def get_by_id(self, product_id: UUID) -> Product | None:
         doc = self._client.get_doc(self._db, str(product_id))
@@ -59,7 +61,9 @@ class CouchDbProductRepository(IProductRepository):
             "type": "product",
             "_id": {"$in": [str(pid) for pid in product_ids]},
         }
-        docs = self._client.find(self._db, {"selector": selector, "limit": len(product_ids)})
+        docs = self._client.find(
+            self._db, {"selector": selector, "limit": len(product_ids)}
+        )
         return [doc_to_product(d) for d in docs]
 
     def exists_by_id(self, product_id: UUID) -> bool:
@@ -281,7 +285,8 @@ class CouchDbProductRepository(IProductRepository):
                 return False
             cats = doc.get("categories", [])
             new_cats = [
-                c for c in cats
+                c
+                for c in cats
                 if not (isinstance(c, dict) and c.get("id") == cat_id_str)
             ]
             if len(new_cats) == len(cats):
@@ -293,7 +298,9 @@ class CouchDbProductRepository(IProductRepository):
             return None
         return self.get_by_id(product_id)
 
-    def add_attachment(self, product_id: UUID, attachment: AttachmentMetadata) -> Product | None:
+    def add_attachment(
+        self, product_id: UUID, attachment: AttachmentMetadata
+    ) -> Product | None:
         """Добавить вложение во встроенный список товара."""
         att_dict = AttachmentCouchDbMapper.to_dict(attachment)
         att_id_str = str(attachment.id)
@@ -313,7 +320,9 @@ class CouchDbProductRepository(IProductRepository):
             return None
         return self.get_by_id(product_id)
 
-    def remove_attachment(self, product_id: UUID, attachment_id: UUID) -> Product | None:
+    def remove_attachment(
+        self, product_id: UUID, attachment_id: UUID
+    ) -> Product | None:
         """Удалить вложение из встроенного списка товара."""
         att_id_str = str(attachment_id)
 
@@ -322,7 +331,8 @@ class CouchDbProductRepository(IProductRepository):
                 return False
             atts = doc.get("attachments", [])
             new_atts = [
-                a for a in atts
+                a
+                for a in atts
                 if not (isinstance(a, dict) and a.get("id") == att_id_str)
             ]
             if len(new_atts) == len(atts):

@@ -17,7 +17,9 @@ class CouchDbNotFoundException(CouchDbException):
 class CouchDbConflictException(CouchDbException):
     """Конфликт версий документа MVCC (HTTP 409 Conflict)."""
 
-    def __init__(self, doc_id: str, message: str = "Конфликт ревизий документа (MVCC).") -> None:
+    def __init__(
+        self, doc_id: str, message: str = "Конфликт ревизий документа (MVCC)."
+    ) -> None:
         super().__init__(f"Конфликт ревизии для документа '{doc_id}': {message}")
         self.doc_id = doc_id
 

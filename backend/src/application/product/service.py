@@ -128,7 +128,9 @@ class ProductService:
 
         return ProductResponseDto.from_domain(product)
 
-    def remove_category(self, product_id: UUID, category_id: UUID) -> ProductResponseDto:
+    def remove_category(
+        self, product_id: UUID, category_id: UUID
+    ) -> ProductResponseDto:
         product = self._product_repository.get_by_id(product_id)
         if product is None:
             raise ProductNotFoundException(product_id)
@@ -139,7 +141,9 @@ class ProductService:
 
         return ProductResponseDto.from_domain(product)
 
-    def get_product_categories(self, product_id: UUID) -> builtins.list[CategoryResponseDto]:
+    def get_product_categories(
+        self, product_id: UUID
+    ) -> builtins.list[CategoryResponseDto]:
         product = self._product_repository.get_by_id(product_id)
         if product is None:
             raise ProductNotFoundException(product_id)
@@ -147,7 +151,9 @@ class ProductService:
         cats = self._product_repository.get_categories(product_id)
         return [CategoryResponseDto.from_domain(c) for c in cats]
 
-    def add_attachment(self, product_id: UUID, attachment_id: UUID) -> ProductResponseDto:
+    def add_attachment(
+        self, product_id: UUID, attachment_id: UUID
+    ) -> ProductResponseDto:
         product = self._product_repository.get_by_id(product_id)
         if product is None:
             raise ProductNotFoundException(product_id)
@@ -158,7 +164,9 @@ class ProductService:
 
         return ProductResponseDto.from_domain(product)
 
-    def remove_attachment(self, product_id: UUID, attachment_id: UUID) -> ProductResponseDto:
+    def remove_attachment(
+        self, product_id: UUID, attachment_id: UUID
+    ) -> ProductResponseDto:
         product = self._product_repository.get_by_id(product_id)
         if product is None:
             raise ProductNotFoundException(product_id)
@@ -169,7 +177,9 @@ class ProductService:
 
         return ProductResponseDto.from_domain(product)
 
-    def get_product_attachments(self, product_id: UUID) -> builtins.list[AttachmentResponseDto]:
+    def get_product_attachments(
+        self, product_id: UUID
+    ) -> builtins.list[AttachmentResponseDto]:
         product = self._product_repository.get_by_id(product_id)
         if product is None:
             raise ProductNotFoundException(product_id)

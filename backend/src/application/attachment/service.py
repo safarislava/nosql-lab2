@@ -41,9 +41,7 @@ class AttachmentService:
         saved = self._attachment_repository.add(product_id, attachment)
         return AttachmentResponseDto.from_domain(saved)
 
-    def get_by_id(
-        self, product_id: UUID, attachment_id: UUID
-    ) -> AttachmentResponseDto:
+    def get_by_id(self, product_id: UUID, attachment_id: UUID) -> AttachmentResponseDto:
         attachment = self._attachment_repository.get_by_id(product_id, attachment_id)
         if attachment is None:
             raise AttachmentNotFoundException(attachment_id)
@@ -65,11 +63,15 @@ class AttachmentService:
         if attachment is None:
             raise AttachmentNotFoundException(attachment_id)
 
-        filename = dto.filename.strip() if dto.filename is not None else attachment.filename
+        filename = (
+            dto.filename.strip() if dto.filename is not None else attachment.filename
+        )
         if dto.filename is not None and not filename:
             raise EmptyFilenameException()
 
-        size_bytes = dto.size_bytes if dto.size_bytes is not None else attachment.size_bytes
+        size_bytes = (
+            dto.size_bytes if dto.size_bytes is not None else attachment.size_bytes
+        )
         if size_bytes < 0:
             raise InvalidFileSizeException()
 
@@ -79,7 +81,9 @@ class AttachmentService:
             else attachment.content_type
         )
         order = dto.order if dto.order is not None else attachment.order
-        checksum = dto.checksum.strip() if dto.checksum is not None else attachment.checksum
+        checksum = (
+            dto.checksum.strip() if dto.checksum is not None else attachment.checksum
+        )
         description = (
             dto.description.strip()
             if dto.description is not None

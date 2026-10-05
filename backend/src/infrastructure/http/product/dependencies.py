@@ -38,7 +38,9 @@ def get_attachment_repository() -> IAttachmentRepository:
 
 ProductRepositoryDep = Annotated[IProductRepository, Depends(get_product_repository)]
 CategoryRepositoryDep = Annotated[ICategoryRepository, Depends(get_category_repository)]
-AttachmentRepositoryDep = Annotated[IAttachmentRepository, Depends(get_attachment_repository)]
+AttachmentRepositoryDep = Annotated[
+    IAttachmentRepository, Depends(get_attachment_repository)
+]
 
 
 def get_category_service(

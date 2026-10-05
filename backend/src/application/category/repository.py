@@ -11,36 +11,26 @@ class ICategoryRepository(ABC):
     """Гранулярный CRUD-интерфейс репозитория категорий конкретного товара."""
 
     @abstractmethod
-    def get_by_id(
-        self, product_id: UUID, category_id: UUID
-    ) -> Category | None:
+    def get_by_id(self, product_id: UUID, category_id: UUID) -> Category | None:
         """Получить категорию товара по ID."""
         raise NotImplementedError
 
     @abstractmethod
-    def list(
-        self, product_id: UUID
-    ) -> builtins.list[Category]:
+    def list(self, product_id: UUID) -> builtins.list[Category]:
         """Получить список всех категорий конкретного товара."""
         raise NotImplementedError
 
     @abstractmethod
-    def add(
-        self, product_id: UUID, category: Category
-    ) -> Category:
+    def add(self, product_id: UUID, category: Category) -> Category:
         """Добавить категорию к товару."""
         raise NotImplementedError
 
     @abstractmethod
-    def update(
-        self, product_id: UUID, category: Category
-    ) -> Category | None:
+    def update(self, product_id: UUID, category: Category) -> Category | None:
         """Обновить существующую категорию товара."""
         raise NotImplementedError
 
     @abstractmethod
-    def delete(
-        self, product_id: UUID, category_id: UUID
-    ) -> bool:
+    def delete(self, product_id: UUID, category_id: UUID) -> bool:
         """Удалить категорию из товара по ID."""
         raise NotImplementedError

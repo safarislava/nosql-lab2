@@ -18,9 +18,7 @@ class IAttachmentRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def list(
-        self, product_id: UUID
-    ) -> builtins.list[AttachmentMetadata]:
+    def list(self, product_id: UUID) -> builtins.list[AttachmentMetadata]:
         """Получить список всех вложений конкретного товара."""
         raise NotImplementedError
 
@@ -39,8 +37,6 @@ class IAttachmentRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def delete(
-        self, product_id: UUID, attachment_id: UUID
-    ) -> bool:
+    def delete(self, product_id: UUID, attachment_id: UUID) -> bool:
         """Удалить вложение из товара по ID."""
         raise NotImplementedError

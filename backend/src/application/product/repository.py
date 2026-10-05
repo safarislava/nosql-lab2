@@ -103,11 +103,15 @@ class IProductRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def add_attachment(self, product_id: UUID, attachment: AttachmentMetadata) -> Product | None:
+    def add_attachment(
+        self, product_id: UUID, attachment: AttachmentMetadata
+    ) -> Product | None:
         """Добавить встроенное вложение к товару."""
         raise NotImplementedError
 
     @abstractmethod
-    def remove_attachment(self, product_id: UUID, attachment_id: UUID) -> Product | None:
+    def remove_attachment(
+        self, product_id: UUID, attachment_id: UUID
+    ) -> Product | None:
         """Удалить встроенное вложение из товара."""
         raise NotImplementedError

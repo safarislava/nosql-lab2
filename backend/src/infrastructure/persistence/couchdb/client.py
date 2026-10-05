@@ -87,7 +87,9 @@ class CouchDbClient:
         try:
             return client.request(method, path, **kwargs)
         except (httpx.ConnectError, httpx.TimeoutException) as exc:
-            logger.error("CouchDB connection error [%s %s on %s]: %s", method, path, url, exc)
+            logger.error(
+                "CouchDB connection error [%s %s on %s]: %s", method, path, url, exc
+            )
             raise CouchDbConnectionException(url, str(exc)) from exc
         except httpx.HTTPError as exc:
             logger.error("CouchDB HTTP error [%s %s]: %s", method, path, exc)
@@ -107,11 +109,15 @@ class CouchDbClient:
     def get_server_info(self, *, node: int = -1) -> dict[str, Any]:
         """Получить информацию об узлах."""
         if node not in (0, 1):
-            return {f"node{n}": self.get_server_info(node=n) for n in range(len(self.nodes))}
+            return {
+                f"node{n}": self.get_server_info(node=n) for n in range(len(self.nodes))
+            }
 
         resp = self._request("GET", "/", node=node)
         if resp.status_code != 200:
-            raise CouchDbException(f"Не удалось получить информацию о сервере: {resp.text}")
+            raise CouchDbException(
+                f"Не удалось получить информацию о сервере: {resp.text}"
+            )
         return resp.json()
 
     def database_exists(self, db: str, *, node: int = -1) -> bool:
@@ -132,7 +138,9 @@ class CouchDbClient:
             return True
         if resp.status_code == 412:
             return False
-        raise CouchDbException(f"Не удалось создать базу '{db}' на узле {node}: {resp.text}")
+        raise CouchDbException(
+            f"Не удалось создать базу '{db}' на узле {node}: {resp.text}"
+        )
 
     def ensure_database(self, db: str, *, node: int = -1) -> bool:
         """Создать базу данных, если она еще не создана."""
@@ -175,7 +183,9 @@ class CouchDbClient:
         if resp.status_code == 200:
             return resp.json()
 
-        raise CouchDbException(f"Ошибка при получении документа '{doc_id}': {resp.text}")
+        raise CouchDbException(
+            f"Ошибка при получении документа '{doc_id}': {resp.text}"
+        )
 
     def save_doc(
         self,
@@ -194,7 +204,9 @@ class CouchDbClient:
 
         if doc_id:
             path = f"/{quote(db, safe='')}/{quote(doc_id, safe='')}"
-            resp = self._request("PUT", path, doc_id=doc_id, node=node, json=doc, params=params)
+            resp = self._request(
+                "PUT", path, doc_id=doc_id, node=node, json=doc, params=params
+            )
         else:
             path = f"/{quote(db, safe='')}"
             resp = self._request("POST", path, node=node, json=doc, params=params)
@@ -250,14 +262,18 @@ class CouchDbClient:
     ) -> bool:
         """Удалить документ по ID и ревизии."""
         path = f"/{quote(db, safe='')}/{quote(doc_id, safe='')}"
-        resp = self._request("DELETE", path, doc_id=doc_id, node=node, params={"rev": rev})
+        resp = self._request(
+            "DELETE", path, doc_id=doc_id, node=node, params={"rev": rev}
+        )
 
         if resp.status_code in (200, 202):
             return True
         if resp.status_code == 404:
             return False
         if resp.status_code == 409:
-            raise CouchDbConflictException(doc_id, "Нельзя удалить устаревшую ревизию (409 Conflict).")
+            raise CouchDbConflictException(
+                doc_id, "Нельзя удалить устаревшую ревизию (409 Conflict)."
+            )
 
         raise CouchDbException(f"Ошибка при удалении документа '{doc_id}': {resp.text}")
 
@@ -280,7 +296,9 @@ class CouchDbClient:
         if resp.status_code in (200, 201):
             return resp.json()
 
-        raise CouchDbException(f"Ошибка при пакетной вставке в базу '{db}': {resp.text}")
+        raise CouchDbException(
+            f"Ошибка при пакетной вставке в базу '{db}': {resp.text}"
+        )
 
     def create_index(
         self,
@@ -291,13 +309,18 @@ class CouchDbClient:
     ) -> dict[str, Any]:
         """Создать Mango-индекс."""
         if node not in (0, 1):
-            return {f"node{n}": self.create_index(db, index_def, node=n) for n in range(len(self.nodes))}
+            return {
+                f"node{n}": self.create_index(db, index_def, node=n)
+                for n in range(len(self.nodes))
+            }
 
         path = f"/{quote(db, safe='')}/_index"
         resp = self._request("POST", path, node=node, json=index_def)
         if resp.status_code in (200, 201):
             return resp.json()
-        raise CouchDbException(f"Ошибка при создании индекса в базе '{db}': {resp.text}")
+        raise CouchDbException(
+            f"Ошибка при создании индекса в базе '{db}': {resp.text}"
+        )
 
     def list_indexes(self, db: str, *, node: int = -1) -> list[dict[str, Any]]:
         """Список существующих индексов."""
@@ -307,7 +330,9 @@ class CouchDbClient:
         if resp.status_code == 200:
             return resp.json().get("indexes", [])
 
-        raise CouchDbException(f"Ошибка при получении индексов базы '{db}': {resp.text}")
+        raise CouchDbException(
+            f"Ошибка при получении индексов базы '{db}': {resp.text}"
+        )
 
     def find(
         self,
@@ -351,16 +376,25 @@ class CouchDbClient:
     ) -> dict[str, Any]:
         """Сохранить дизайн-документ."""
         if node not in (0, 1):
-            return {f"node{n}": self.save_design_doc(db, ddoc_name, ddoc, node=n) for n in range(len(self.nodes))}
+            return {
+                f"node{n}": self.save_design_doc(db, ddoc_name, ddoc, node=n)
+                for n in range(len(self.nodes))
+            }
 
-        clean_name = ddoc_name if ddoc_name.startswith("_design/") else f"_design/{ddoc_name}"
+        clean_name = (
+            ddoc_name if ddoc_name.startswith("_design/") else f"_design/{ddoc_name}"
+        )
         path = f"/{quote(db, safe='')}/{clean_name}"
         resp = self._request("PUT", path, node=node, json=ddoc)
         if resp.status_code in (200, 201):
             return resp.json()
         if resp.status_code == 409:
-            raise CouchDbConflictException(clean_name, "Дизайн-документ уже существует или ревизия устарела.")
-        raise CouchDbException(f"Ошибка сохранения дизайн-документа '{clean_name}': {resp.text}")
+            raise CouchDbConflictException(
+                clean_name, "Дизайн-документ уже существует или ревизия устарела."
+            )
+        raise CouchDbException(
+            f"Ошибка сохранения дизайн-документа '{clean_name}': {resp.text}"
+        )
 
     def get_design_doc(
         self,
@@ -370,7 +404,9 @@ class CouchDbClient:
         node: int = -1,
     ) -> dict[str, Any] | None:
         """Получить дизайн-документ."""
-        clean_name = ddoc_name if ddoc_name.startswith("_design/") else f"_design/{ddoc_name}"
+        clean_name = (
+            ddoc_name if ddoc_name.startswith("_design/") else f"_design/{ddoc_name}"
+        )
         path = f"/{quote(db, safe='')}/{clean_name}"
         resp = self._request("GET", path, node=node)
 
@@ -379,7 +415,9 @@ class CouchDbClient:
         if resp.status_code == 200:
             return resp.json()
 
-        raise CouchDbException(f"Ошибка получения дизайн-документа '{clean_name}': {resp.text}")
+        raise CouchDbException(
+            f"Ошибка получения дизайн-документа '{clean_name}': {resp.text}"
+        )
 
     def query_view(
         self,
@@ -413,7 +451,9 @@ class CouchDbClient:
         if resp.status_code == 200:
             return resp.json().get("rows", [])
 
-        raise CouchDbException(f"Ошибка выполнения MapReduce view '{clean_ddoc}/{view_name}': {resp.text}")
+        raise CouchDbException(
+            f"Ошибка выполнения MapReduce view '{clean_ddoc}/{view_name}': {resp.text}"
+        )
 
     def replicate(
         self,
@@ -440,7 +480,9 @@ class CouchDbClient:
         if resp.status_code in (200, 202):
             return resp.json()
 
-        raise CouchDbException(f"Ошибка запуска репликации ({source} -> {target}): {resp.text}")
+        raise CouchDbException(
+            f"Ошибка запуска репликации ({source} -> {target}): {resp.text}"
+        )
 
     def setup_two_way_replication(self, db: str) -> dict[str, Any]:
         """Настроить двустороннюю непрерывную репликацию между узлами."""
@@ -487,7 +529,9 @@ class CouchDbClient:
             try:
                 self.delete_doc(db, doc_id, rev, node=node)
             except CouchDbException as exc:
-                logger.warning("Не удалось удалить конфликтующую ревизию %s: %s", rev, exc)
+                logger.warning(
+                    "Не удалось удалить конфликтующую ревизию %s: %s", rev, exc
+                )
         return result
 
 
@@ -500,4 +544,3 @@ def get_couchdb_client() -> CouchDbClient:
 def close_couchdb_client() -> None:
     """Закрыть клиент CouchDB."""
     get_couchdb_client().close()
-

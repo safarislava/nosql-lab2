@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class CouchDbAttachmentRepository(IAttachmentRepository):
     """Гранулярный CRUD-репозиторий вложений в CouchDB.
-    
+
     Вложения хранятся непосредственно как встроенный массив `attachments`
     внутри документа товара в базе `products`.
     """
@@ -54,9 +54,7 @@ class CouchDbAttachmentRepository(IAttachmentRepository):
 
         return None
 
-    def list(
-        self, product_id: UUID
-    ) -> builtins.list[AttachmentMetadata]:
+    def list(self, product_id: UUID) -> builtins.list[AttachmentMetadata]:
         """Получить список всех встроенных вложений конкретного товара."""
         doc = self._client.get_doc(self._db, str(product_id))
         if not doc or doc.get("type") != "product":
@@ -113,9 +111,7 @@ class CouchDbAttachmentRepository(IAttachmentRepository):
             return None
         return attachment
 
-    def delete(
-        self, product_id: UUID, attachment_id: UUID
-    ) -> bool:
+    def delete(self, product_id: UUID, attachment_id: UUID) -> bool:
         """Удалить встроенное вложение из товара по ID."""
         att_id_str = str(attachment_id)
 
@@ -124,7 +120,8 @@ class CouchDbAttachmentRepository(IAttachmentRepository):
                 return False
             atts = doc.get("attachments", [])
             new_atts = [
-                a for a in atts
+                a
+                for a in atts
                 if not (isinstance(a, dict) and a.get("id") == att_id_str)
             ]
             if len(new_atts) == len(atts):

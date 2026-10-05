@@ -47,4 +47,3 @@ def get_history_service() -> HistoryService:
 
 
 HistoryServiceDep = Annotated[HistoryService, Depends(get_history_service)]
-
