@@ -117,3 +117,17 @@ class CouchDbEmbeddedCategoryRepository(ICategoryRepository):
             return True
 
         return self._client.mutate_doc(self._db, str(product_id), mutator)
+
+    def save_missing_categories(
+        self,
+        categories: builtins.list[Category],
+    ) -> builtins.list[UUID]:
+        """В схеме v1 отдельная БД категорий не ведется, возвращаются ID категорий."""
+        raise NotImplementedError
+
+    def filter_existing_category_ids(
+        self,
+        category_ids: builtins.list[UUID],
+    ) -> builtins.list[UUID]:
+        """В схеме v1 внешняя проверка ID не требуется."""
+        raise NotImplementedError

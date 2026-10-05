@@ -62,3 +62,15 @@ class CompositeCategoryRepository(ICategoryRepository):
     def delete(self, product_id: UUID, category_id: UUID) -> bool:
         self._ensure_migrated(product_id)
         return self._active_repo.delete(product_id, category_id)
+
+    def save_missing_categories(
+        self,
+        categories: builtins.list[Category],
+    ) -> builtins.list[UUID]:
+        return self._active_repo.save_missing_categories(categories)
+
+    def filter_existing_category_ids(
+        self,
+        category_ids: builtins.list[UUID],
+    ) -> builtins.list[UUID]:
+        return self._active_repo.filter_existing_category_ids(category_ids)

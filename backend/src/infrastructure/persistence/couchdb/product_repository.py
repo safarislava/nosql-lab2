@@ -54,7 +54,6 @@ class CouchDbProductRepository(IProductRepository):
     ) -> None:
         self._client = client
         self._db = settings.couchdb.products_db
-        self._categories_db = settings.couchdb.categories_db
         self._migrator = CategoryMigrator(client=self._client)
         self._category_repo = category_repo or CompositeCategoryRepository(
             v1_repo=CouchDbEmbeddedCategoryRepository(client=self._client),
@@ -67,7 +66,6 @@ class CouchDbProductRepository(IProductRepository):
     def _ensure_db_initialized(self) -> None:
         try:
             self._client.ensure_database(self._db)
-            self._client.ensure_database(self._categories_db)
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Не удалось проверить или создать базу '%s': %s", self._db, exc
@@ -133,63 +131,17 @@ class CouchDbProductRepository(IProductRepository):
         docs = self._client.find(self._db, mango_query)
         return [doc_to_product(self._maybe_lazy_migrate(d)) for d in docs]
 
-    def _sync_categories(
+    def _resolve_v2_category_ids(
         self,
-        categories: builtins.list[Category],
+        categories: builtins.list[Category] | None,
+        category_ids: builtins.list[UUID] | None,
     ) -> builtins.list[UUID]:
-        """Обработать категории для v2:
-        - существующие в categories_db категории НЕ должны мутировать;
-        - если категории нет в базе, она создается в categories_db с данными из запроса;
-        - идентификаторы категорий прикрепляются к товару.
-        """
-        if not categories:
-            return []
-
-        unique_cats: dict[str, Category] = {}
-        ordered_ids: builtins.list[UUID] = []
-        for cat in categories:
-            if not cat or not getattr(cat, "id", None):
-                continue
-            cat_id_str = str(cat.id)
-            if cat_id_str not in unique_cats:
-                unique_cats[cat_id_str] = cat
-                ordered_ids.append(cat.id)
-
-        if not unique_cats:
-            return []
-
-        query = CategoryCouchDbMapper.find_by_ids_query(list(unique_cats.keys()))
-        existing_docs = self._client.find(self._categories_db, query)
-        existing_ids = {
-            str(doc["_id"])
-            for doc in existing_docs
-            if doc.get("type") == "category" and "_id" in doc
-        }
-
-        for cat_id_str, cat in unique_cats.items():
-            if cat_id_str not in existing_ids:
-                self._client.save_doc(
-                    self._categories_db,
-                    CategoryCouchDbMapper.to_dict(cat),
-                )
-
-        return ordered_ids
-
-    def _filter_existing_category_ids(
-        self,
-        category_ids: builtins.list[UUID],
-    ) -> builtins.list[UUID]:
-        """Оставить только существующие в categories_db ID категорий (батч-запрос)."""
-        if not category_ids:
-            return []
-        query = CategoryCouchDbMapper.find_by_ids_query(category_ids)
-        existing_docs = self._client.find(self._categories_db, query)
-        existing_ids = {
-            str(doc["_id"])
-            for doc in existing_docs
-            if doc.get("type") == "category" and "_id" in doc
-        }
-        return [cid for cid in category_ids if str(cid) in existing_ids]
+        """Определить список ID категорий товара для схемы v2."""
+        if categories is not None:
+            return self._category_repo.save_missing_categories(categories)
+        if category_ids:
+            return self._category_repo.filter_existing_category_ids(category_ids)
+        return []
 
     def create(
         self,
@@ -210,12 +162,9 @@ class CouchDbProductRepository(IProductRepository):
         )
 
         if settings.app_version >= 2:
-            if categories is not None:
-                product.category_ids = self._sync_categories(categories)
-            elif product.category_ids:
-                product.category_ids = self._filter_existing_category_ids(
-                    product.category_ids
-                )
+            product.category_ids = self._resolve_v2_category_ids(
+                categories, product.category_ids
+            )
 
             doc = product_to_doc(
                 product,
@@ -273,12 +222,9 @@ class CouchDbProductRepository(IProductRepository):
 
         embedded_cats: builtins.list[dict[str, Any]] | None = None
         if settings.app_version >= 2:
-            if categories is not None:
-                product.category_ids = self._sync_categories(categories)
-            elif product.category_ids:
-                product.category_ids = self._filter_existing_category_ids(
-                    product.category_ids
-                )
+            product.category_ids = self._resolve_v2_category_ids(
+                categories, product.category_ids
+            )
         else:
             if categories is not None:
                 embedded_cats = [CategoryCouchDbMapper.to_dict(c) for c in categories]

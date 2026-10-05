@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 import logging
+from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
@@ -123,3 +124,46 @@ class CouchDbReferencedCategoryRepository(ICategoryRepository):
             return True
 
         return self._client.mutate_doc(self._products_db, str(product_id), mutator)
+
+    def _find_existing_ids(self, ids: Sequence[UUID | str]) -> set[str]:
+        """Получить множество существующих строковых _id категорий."""
+        if not ids:
+            return set()
+        query = CategoryCouchDbMapper.find_by_ids_query(ids)
+        return {
+            str(doc["_id"])
+            for doc in self._client.find(self._categories_db, query)
+            if "_id" in doc
+        }
+
+    def save_missing_categories(
+        self,
+        categories: builtins.list[Category],
+    ) -> builtins.list[UUID]:
+        """Обработать категории для v2:
+        - существующие в categories_db категории НЕ должны мутировать;
+        - если категории нет в базе, она создается в categories_db с данными из запроса;
+        - идентификаторы категорий возвращаются для прикрепления к товару.
+        """
+        cats_by_id = {str(c.id): c for c in categories if getattr(c, "id", None)}
+        if not cats_by_id:
+            return []
+
+        existing_ids = self._find_existing_ids(list(cats_by_id.keys()))
+
+        for cat_id, cat in cats_by_id.items():
+            if cat_id not in existing_ids:
+                self._client.save_doc(
+                    self._categories_db,
+                    CategoryCouchDbMapper.to_dict(cat),
+                )
+
+        return [c.id for c in cats_by_id.values()]
+
+    def filter_existing_category_ids(
+        self,
+        category_ids: builtins.list[UUID],
+    ) -> builtins.list[UUID]:
+        """Оставить только существующие в categories_db ID категорий (батч-запрос)."""
+        existing_ids = self._find_existing_ids(category_ids)
+        return [cid for cid in category_ids if str(cid) in existing_ids]
