@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from uuid import UUID
 
@@ -5,34 +7,39 @@ from domain.attachment import AttachmentMetadata
 
 
 class IAttachmentRepository(ABC):
-    """Интерфейс репозитория метаданных вложений."""
+    """Гранулярный интерфейс репозитория метаданных вложений конкретного товара."""
 
     @abstractmethod
-    def get_by_id(self, attachment_id: UUID) -> AttachmentMetadata | None:
-        """Получить вложение по ID."""
+    def get_by_id(
+        self, product_id: UUID, attachment_id: UUID
+    ) -> AttachmentMetadata | None:
+        """Получить вложение товара по ID."""
         raise NotImplementedError
 
     @abstractmethod
-    def get_by_ids(self, attachment_ids: list[UUID]) -> list[AttachmentMetadata]:
-        """Получить список вложений по их ID."""
+    def list_by_product_id(
+        self, product_id: UUID
+    ) -> list[AttachmentMetadata]:
+        """Получить список всех вложений конкретного товара."""
         raise NotImplementedError
 
     @abstractmethod
-    def exists_by_id(self, attachment_id: UUID) -> bool:
-        """Проверить существование вложения."""
+    def save(
+        self, product_id: UUID, attachment: AttachmentMetadata
+    ) -> AttachmentMetadata:
+        """Сохранить метаданные вложения внутри товара."""
         raise NotImplementedError
 
     @abstractmethod
-    def list(self) -> list[AttachmentMetadata]:
-        """Получить список всех вложений."""
+    def update_attachment(
+        self, product_id: UUID, attachment: AttachmentMetadata
+    ) -> AttachmentMetadata | None:
+        """Обновить метаданные встроенного вложения."""
         raise NotImplementedError
 
     @abstractmethod
-    def save(self, attachment: AttachmentMetadata) -> AttachmentMetadata:
-        """Сохранить метаданные вложения."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def delete(self, attachment_id: UUID) -> bool:
-        """Удалить метаданные вложения."""
+    def delete(
+        self, product_id: UUID, attachment_id: UUID
+    ) -> bool:
+        """Удалить метаданные вложения из товара."""
         raise NotImplementedError
