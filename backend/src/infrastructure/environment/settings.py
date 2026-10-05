@@ -36,10 +36,25 @@ class PostgresSettings(BaseModel):
         return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.db}"
 
 
+class CouchDbSettings(BaseModel):
+    node0_url: str
+    node1_url: str
+    user: str
+    password: str
+    products_db: str
+    categories_db: str
+    timeout: float
+
+    @property
+    def nodes(self) -> list[str]:
+        return [self.node0_url, self.node1_url]
+
+
 class Settings(BaseSettings):
     riak: RiakSettings
     postgres: PostgresSettings
     auth: AuthSettings
+    couchdb: CouchDbSettings
 
     model_config = SettingsConfigDict(
         env_file=_ENV_FILE,

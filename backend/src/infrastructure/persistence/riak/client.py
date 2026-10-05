@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from functools import cache
 from typing import Any
 
 import httpx
@@ -309,12 +310,12 @@ class RiakClient:
         return response.json().get("value", {})
 
 
-_client = RiakClient()
-
-
+@cache
 def get_riak_client() -> RiakClient:
-    return _client
+    """Синглтон RiakClient."""
+    return RiakClient()
 
 
 def close_riak_client() -> None:
-    _client.close()
+    """Закрыть клиент Riak."""
+    get_riak_client().close()

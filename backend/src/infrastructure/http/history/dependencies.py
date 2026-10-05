@@ -1,3 +1,4 @@
+from functools import cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -15,39 +16,34 @@ from infrastructure.persistence.riak.history_cache_repository import (
     RiakHistoryCacheRepository,
 )
 
-_postgres_history_repository: PostgresHistoryRepository = PostgresHistoryRepository()
-_riak_history_cache_repository: RiakHistoryCacheRepository = (
-    RiakHistoryCacheRepository()
-)
-_history_repository: IHistoryRepository = CompositeHistoryRepository(
-    postgres_repo=_postgres_history_repository,
-    riak_repo=_riak_history_cache_repository,
-)
 
-
+@cache
 def get_postgres_history_repository() -> PostgresHistoryRepository:
-    return _postgres_history_repository
+    return PostgresHistoryRepository()
 
 
+@cache
 def get_riak_history_cache_repository() -> RiakHistoryCacheRepository:
-    return _riak_history_cache_repository
+    return RiakHistoryCacheRepository()
 
 
+@cache
 def get_history_repository() -> IHistoryRepository:
-    return _history_repository
+    return CompositeHistoryRepository(
+        postgres_repo=get_postgres_history_repository(),
+        riak_repo=get_riak_history_cache_repository(),
+    )
 
 
 HistoryRepositoryDep = Annotated[IHistoryRepository, Depends(get_history_repository)]
 
 
-_history_service: HistoryService = HistoryService(
-    history_repository=_history_repository,
-    event_bus=get_event_bus(),
-)
-
-
+@cache
 def get_history_service() -> HistoryService:
-    return _history_service
+    return HistoryService(
+        history_repository=get_history_repository(),
+        event_bus=get_event_bus(),
+    )
 
 
 HistoryServiceDep = Annotated[HistoryService, Depends(get_history_service)]

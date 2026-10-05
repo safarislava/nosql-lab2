@@ -1,3 +1,4 @@
+from functools import cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -9,11 +10,10 @@ from infrastructure.persistence.riak.recovery_token_repository import (
     RiakRecoveryTokenRepository,
 )
 
-_recovery_token_repository: IRecoveryTokenRepository = RiakRecoveryTokenRepository()
 
-
+@cache
 def get_recovery_token_repository() -> IRecoveryTokenRepository:
-    return _recovery_token_repository
+    return RiakRecoveryTokenRepository()
 
 
 RecoveryTokenRepositoryDep = Annotated[

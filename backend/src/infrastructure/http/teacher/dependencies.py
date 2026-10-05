@@ -1,3 +1,4 @@
+from functools import cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -12,11 +13,10 @@ from infrastructure.persistence.postgres.teacher_repository import (
     PostgresTeacherRepository,
 )
 
-_teacher_repository: ITeacherRepository = PostgresTeacherRepository()
 
-
+@cache
 def get_teacher_repository() -> ITeacherRepository:
-    return _teacher_repository
+    return PostgresTeacherRepository()
 
 
 TeacherRepositoryDep = Annotated[ITeacherRepository, Depends(get_teacher_repository)]

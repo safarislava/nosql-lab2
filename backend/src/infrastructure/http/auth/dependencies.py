@@ -1,3 +1,4 @@
+from functools import cache
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -21,23 +22,22 @@ from infrastructure.persistence.riak.session_repository import (
 )
 from infrastructure.security.jwt_service import JwtTokenService
 
-_token_service: ITokenService = JwtTokenService(
-    secret_key=settings.auth.jwt_secret_key,
-    algorithm=settings.auth.jwt_algorithm,
-    expire_minutes=settings.auth.access_token_expire_minutes,
-)
-_session_repository: ISessionRepository = RiakSessionRepository()
 
-
+@cache
 def get_token_service() -> ITokenService:
-    return _token_service
+    return JwtTokenService(
+        secret_key=settings.auth.jwt_secret_key,
+        algorithm=settings.auth.jwt_algorithm,
+        expire_minutes=settings.auth.access_token_expire_minutes,
+    )
 
 
 TokenServiceDep = Annotated[ITokenService, Depends(get_token_service)]
 
 
+@cache
 def get_session_repository() -> ISessionRepository:
-    return _session_repository
+    return RiakSessionRepository()
 
 
 SessionRepositoryDep = Annotated[ISessionRepository, Depends(get_session_repository)]

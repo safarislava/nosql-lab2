@@ -1,3 +1,4 @@
+from functools import cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -10,11 +11,10 @@ from infrastructure.persistence.riak.favourites_repository import (
     RiakFavouritesRepository,
 )
 
-_favourites_repository: IFavouritesRepository = RiakFavouritesRepository()
 
-
+@cache
 def get_favourites_repository() -> IFavouritesRepository:
-    return _favourites_repository
+    return RiakFavouritesRepository()
 
 
 FavouritesRepositoryDep = Annotated[

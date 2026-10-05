@@ -1,3 +1,4 @@
+from functools import cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -11,16 +12,15 @@ from infrastructure.persistence.postgres.user_repository import (
 )
 from infrastructure.security.password_hasher import BcryptPasswordHasher
 
-_password_hasher: IPasswordHasher = BcryptPasswordHasher(rounds=12)
-_user_repository: IUserRepository = PostgresUserRepository()
 
-
+@cache
 def get_user_repository() -> IUserRepository:
-    return _user_repository
+    return PostgresUserRepository()
 
 
+@cache
 def get_password_hasher() -> IPasswordHasher:
-    return _password_hasher
+    return BcryptPasswordHasher(rounds=12)
 
 
 UserRepositoryDep = Annotated[IUserRepository, Depends(get_user_repository)]
