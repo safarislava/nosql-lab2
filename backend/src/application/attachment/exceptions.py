@@ -17,6 +17,14 @@ class AttachmentNotFoundException(AttachmentException):
         self.identifier = identifier
 
 
+class AttachmentAlreadyExistsException(AttachmentException):
+    status_code: int = 409
+
+    def __init__(self, identifier: str | UUID):
+        super().__init__(f"Вложение с ID '{identifier}' уже существует.")
+        self.identifier = identifier
+
+
 class EmptyFilenameException(AttachmentException):
     def __init__(self, message: str = "Имя файла не может быть пустым."):
         super().__init__(message)

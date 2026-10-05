@@ -38,7 +38,7 @@ class AttachmentService:
             checksum=dto.checksum.strip(),
             description=dto.description.strip(),
         )
-        saved = self._attachment_repository.save(product_id, attachment)
+        saved = self._attachment_repository.add(product_id, attachment)
         return AttachmentResponseDto.from_domain(saved)
 
     def get_by_id(
@@ -51,7 +51,7 @@ class AttachmentService:
 
     def list(self, product_id: UUID) -> AttachmentListResponseDto:
         """Получить список вложений конкретного товара."""
-        items = self._attachment_repository.list_by_product_id(product_id)
+        items = self._attachment_repository.list(product_id)
         sorted_items = sorted(items, key=lambda a: a.order)
         return AttachmentListResponseDto(
             items=[AttachmentResponseDto.from_domain(a) for a in sorted_items],
@@ -96,7 +96,7 @@ class AttachmentService:
             checksum=checksum,
             description=description,
         )
-        saved = self._attachment_repository.update_attachment(product_id, updated)
+        saved = self._attachment_repository.update(product_id, updated)
         if saved is None:
             raise AttachmentNotFoundException(attachment_id)
         return AttachmentResponseDto.from_domain(saved)

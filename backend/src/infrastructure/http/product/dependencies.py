@@ -9,24 +9,31 @@ from application.category.repository import ICategoryRepository
 from application.category.service import CategoryService
 from application.product.repository import IProductRepository
 from application.product.service import ProductService
-from infrastructure.persistence.postgres.product_repository import (
-    PostgresProductRepository,
+from infrastructure.persistence.couchdb.attachment_repository import (
+    CouchDbAttachmentRepository,
+)
+from infrastructure.persistence.couchdb.category_repository import (
+    CouchDbCategoryRepository,
+)
+from infrastructure.persistence.couchdb.client import get_couchdb_client
+from infrastructure.persistence.couchdb.product_repository import (
+    CouchDbProductRepository,
 )
 
 
 @cache
 def get_product_repository() -> IProductRepository:
-    return PostgresProductRepository()
+    return CouchDbProductRepository(client=get_couchdb_client())
 
 
 @cache
 def get_category_repository() -> ICategoryRepository:
-    raise NotImplementedError("CouchDbCategoryRepository will be connected next")
+    return CouchDbCategoryRepository(client=get_couchdb_client())
 
 
 @cache
 def get_attachment_repository() -> IAttachmentRepository:
-    raise NotImplementedError("CouchDbAttachmentRepository will be connected next")
+    return CouchDbAttachmentRepository(client=get_couchdb_client())
 
 
 ProductRepositoryDep = Annotated[IProductRepository, Depends(get_product_repository)]
@@ -52,13 +59,9 @@ AttachmentServiceDep = Annotated[AttachmentService, Depends(get_attachment_servi
 
 def get_product_service(
     product_repository: ProductRepositoryDep,
-    category_service: CategoryServiceDep,
-    attachment_service: AttachmentServiceDep,
 ) -> ProductService:
     return ProductService(
         product_repository=product_repository,
-        category_service=category_service,
-        attachment_service=attachment_service,
     )
 
 

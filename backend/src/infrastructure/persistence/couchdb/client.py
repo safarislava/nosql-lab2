@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+from collections.abc import Callable
 from functools import cache
 from types import TracebackType
 from typing import Any, Self
@@ -208,6 +209,36 @@ class CouchDbClient:
             raise CouchDbNotFoundException(f"{db}/{doc_id}")
 
         raise CouchDbException(f"Ошибка при сохранении документа: {resp.text}")
+
+    def mutate_doc(
+        self,
+        db: str,
+        doc_id: str,
+        mutator: Callable[[dict[str, Any]], bool],
+        *,
+        create_if_missing: bool = False,
+        max_retries: int = 5,
+    ) -> bool:
+        """Атомарно модифицировать документ с повторами при MVCC-конфликтах."""
+        for _ in range(max_retries):
+            doc = self.get_doc(db, doc_id)
+            if doc is None:
+                if not create_if_missing:
+                    return False
+                doc = {"_id": doc_id}
+
+            if not mutator(doc):
+                return False
+
+            try:
+                self.save_doc(db, doc)
+                return True
+            except CouchDbConflictException:
+                continue
+
+        raise CouchDbConflictException(
+            doc_id, "Превышено число попыток обновления из-за конфликта ревизий."
+        )
 
     def delete_doc(
         self,

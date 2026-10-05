@@ -17,6 +17,14 @@ class CategoryNotFoundException(CategoryException):
         self.identifier = identifier
 
 
+class CategoryAlreadyExistsException(CategoryException):
+    status_code: int = 409
+
+    def __init__(self, identifier: str | UUID):
+        super().__init__(f"Категория с ID '{identifier}' уже существует.")
+        self.identifier = identifier
+
+
 class EmptyCategoryNameException(CategoryException):
     def __init__(self, message: str = "Название категории не может быть пустым."):
         super().__init__(message)

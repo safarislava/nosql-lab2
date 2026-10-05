@@ -17,6 +17,14 @@ class ProductNotFoundException(ProductException):
         self.identifier = identifier
 
 
+class ProductAlreadyExistsException(ProductException):
+    status_code: int = 409
+
+    def __init__(self, identifier: str | UUID):
+        super().__init__(f"Товар с ID '{identifier}' уже существует.")
+        self.identifier = identifier
+
+
 class InsufficientStockException(ProductException):
     status_code: int = 400
 

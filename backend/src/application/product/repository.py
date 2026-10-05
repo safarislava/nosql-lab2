@@ -38,14 +38,33 @@ class IProductRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def create(
+        self,
+        product: Product,
+        categories: builtins.list[Category] | None = None,
+        attachments: builtins.list[AttachmentMetadata] | None = None,
+    ) -> Product:
+        """Создать новый товар."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def update(
+        self,
+        product: Product,
+        categories: builtins.list[Category] | None = None,
+        attachments: builtins.list[AttachmentMetadata] | None = None,
+    ) -> Product | None:
+        """Обновить существующий товар."""
+        raise NotImplementedError
+
+    @abstractmethod
     def save(
         self,
         product: Product,
         categories: builtins.list[Category] | None = None,
         attachments: builtins.list[AttachmentMetadata] | None = None,
     ) -> Product:
-
-        """Сохранить товар (опционально с объектами встроенных категорий и вложений)."""
+        """Сохранить товар (upsert: создать или обновить)."""
         raise NotImplementedError
 
     @abstractmethod

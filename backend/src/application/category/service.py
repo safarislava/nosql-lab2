@@ -32,7 +32,7 @@ class CategoryService:
             slug=dto.slug.strip(),
             description=dto.description.strip(),
         )
-        saved = self._category_repository.add_to_product(product_id, category)
+        saved = self._category_repository.add(product_id, category)
         return CategoryResponseDto.from_domain(saved)
 
     def get_by_id(
@@ -45,7 +45,7 @@ class CategoryService:
 
     def list(self, product_id: UUID) -> CategoryListResponseDto:
         """Получить список категорий конкретного товара."""
-        items = self._category_repository.list_by_product_id(product_id)
+        items = self._category_repository.list(product_id)
         return CategoryListResponseDto(
             items=[CategoryResponseDto.from_domain(c) for c in items],
             total=len(items),
@@ -75,12 +75,12 @@ class CategoryService:
             slug=slug,
             description=description,
         )
-        saved = self._category_repository.update_category(product_id, updated)
+        saved = self._category_repository.update(product_id, updated)
         if saved is None:
             raise CategoryNotFoundException(category_id)
         return CategoryResponseDto.from_domain(saved)
 
     def remove_category(self, product_id: UUID, category_id: UUID) -> bool:
-        if not self._category_repository.remove_from_product(product_id, category_id):
+        if not self._category_repository.delete(product_id, category_id):
             raise CategoryNotFoundException(category_id)
         return True

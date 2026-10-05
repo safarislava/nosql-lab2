@@ -47,7 +47,7 @@ class ProductService:
             category_ids=list(dto.category_ids),
             attachment_ids=list(dto.attachment_ids),
         )
-        saved_product = self._product_repository.save(product)
+        saved_product = self._product_repository.create(product)
         return ProductResponseDto.from_domain(saved_product)
 
     def get_by_id(self, product_id: UUID) -> ProductResponseDto:
@@ -112,7 +112,9 @@ class ProductService:
         if dto.attachment_ids is not None:
             product.attachment_ids = list(dto.attachment_ids)
 
-        saved_product = self._product_repository.save(product)
+        saved_product = self._product_repository.update(product)
+        if saved_product is None:
+            raise ProductNotFoundException(product_id)
         return ProductResponseDto.from_domain(saved_product)
 
     def add_category(self, product_id: UUID, category_id: UUID) -> ProductResponseDto:
@@ -122,7 +124,7 @@ class ProductService:
 
         if category_id not in product.category_ids:
             product.category_ids.append(category_id)
-            self._product_repository.save(product)
+            self._product_repository.update(product)
 
         return ProductResponseDto.from_domain(product)
 
@@ -133,7 +135,7 @@ class ProductService:
 
         if category_id in product.category_ids:
             product.category_ids.remove(category_id)
-            self._product_repository.save(product)
+            self._product_repository.update(product)
 
         return ProductResponseDto.from_domain(product)
 
@@ -152,7 +154,7 @@ class ProductService:
 
         if attachment_id not in product.attachment_ids:
             product.attachment_ids.append(attachment_id)
-            self._product_repository.save(product)
+            self._product_repository.update(product)
 
         return ProductResponseDto.from_domain(product)
 
@@ -163,7 +165,7 @@ class ProductService:
 
         if attachment_id in product.attachment_ids:
             product.attachment_ids.remove(attachment_id)
-            self._product_repository.save(product)
+            self._product_repository.update(product)
 
         return ProductResponseDto.from_domain(product)
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 from abc import ABC, abstractmethod
 from uuid import UUID
 
@@ -7,46 +8,39 @@ from domain.category import Category
 
 
 class ICategoryRepository(ABC):
-    """Гранулярный интерфейс репозитория категорий конкретного товара."""
+    """Гранулярный CRUD-интерфейс репозитория категорий конкретного товара."""
 
     @abstractmethod
     def get_by_id(
         self, product_id: UUID, category_id: UUID
     ) -> Category | None:
-        """Получить встроенную категорию товара по ID."""
+        """Получить категорию товара по ID."""
         raise NotImplementedError
 
     @abstractmethod
-    def list_by_product_id(
+    def list(
         self, product_id: UUID
-    ) -> list[Category]:
+    ) -> builtins.list[Category]:
         """Получить список всех категорий конкретного товара."""
         raise NotImplementedError
 
     @abstractmethod
-    def add_to_product(
+    def add(
         self, product_id: UUID, category: Category
     ) -> Category:
-        """Встроить категорию в товар."""
+        """Добавить категорию к товару."""
         raise NotImplementedError
 
     @abstractmethod
-    def save(
-        self, product_id: UUID, category: Category
-    ) -> Category:
-        """Сохранить встроенную категорию товара (upsert: создание или обновление)."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def update_category(
+    def update(
         self, product_id: UUID, category: Category
     ) -> Category | None:
-        """Обновить встроенную категорию товара."""
+        """Обновить существующую категорию товара."""
         raise NotImplementedError
 
     @abstractmethod
-    def remove_from_product(
+    def delete(
         self, product_id: UUID, category_id: UUID
     ) -> bool:
-        """Удалить категорию из встроенных у товара."""
+        """Удалить категорию из товара по ID."""
         raise NotImplementedError
