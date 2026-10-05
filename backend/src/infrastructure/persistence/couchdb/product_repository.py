@@ -16,7 +16,6 @@ from application.product.repository import IProductRepository
 from domain.attachment import AttachmentMetadata
 from domain.category import Category
 from domain.product import Product
-
 from infrastructure.environment.settings import settings
 from infrastructure.persistence.composite.category_repository import (
     CompositeCategoryRepository,
