@@ -74,10 +74,10 @@ class TestFavouritesFunctional:
         repos: RepositoriesContainer,
     ) -> None:
         """Основной поток: добавление нескольких товаров и последующая очистка избранного."""
-        p1 = repos.product_repo.save(
+        p1 = repos.product_repo.create(
             Product(name="Книга 1", description="", price=Decimal(100), quantity=5)
         )
-        p2 = repos.product_repo.save(
+        p2 = repos.product_repo.create(
             Product(name="Книга 2", description="", price=Decimal(200), quantity=5)
         )
 

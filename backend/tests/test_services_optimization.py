@@ -33,7 +33,7 @@ class TestServicesHydration:
             price=Decimal("500.00"),
             quantity=3,
         )
-        repos.product_repo.save(p2)
+        repos.product_repo.create(p2)
 
         # Добавляем 2 шт первого товара (цена 1500) и 1 шт второго товара (цена 500)
         cart_service.update_quantity(

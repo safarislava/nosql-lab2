@@ -534,4 +534,4 @@ def sample_product(repos: RepositoriesContainer) -> Product:
         price=Decimal("1500.00"),
         quantity=10,
     )
-    return repos.product_repo.save(product)
+    return repos.product_repo.create(product)

@@ -576,6 +576,153 @@ def test_product_repository_category_delegation() -> None:
     assert len(cats_after) == 0
 
 
+def test_v2_create_and_update_category_handling() -> None:
+    """Тест: create и update не мутируют существующие категории, создают недостающие и прикрепляют только валидные."""
+    mock_client = MockCouchDbClient()
+    settings.app_version = 2
+    repo = CouchDbProductRepository(client=mock_client)  # type: ignore[arg-type]
+
+    # 1. Существующая категория
+    existing_cat_id = uuid4()
+    mock_client.save_doc(
+        settings.couchdb.categories_db,
+        {
+            "_id": str(existing_cat_id),
+            "type": "category",
+            "name": "Оригинал",
+            "slug": "orig",
+            "description": "Исходное описание",
+        },
+    )
+
+    # 2. Категории для создания:
+    # - существующая с попыткой перезаписать поля (НЕ должна мутировать)
+    # - новая категория (должна создаться в categories_db)
+    cat_existing = Category(
+        id=existing_cat_id,
+        name="Попытка перезаписи",
+        slug="changed",
+        description="Новое описание",
+    )
+    new_cat = Category(
+        name="Новая категория",
+        slug="new-cat",
+        description="Создается",
+    )
+
+    prod = Product(
+        name="Тестовый товар",
+        description="Описание",
+        price=Decimal("199.99"),
+        quantity=10,
+    )
+
+    # CREATE
+    created = repo.create(
+        prod,
+        categories=[cat_existing, new_cat],
+    )
+
+    # Прикрепились существующая и новая категория
+    assert created.category_ids == [existing_cat_id, new_cat.id]
+
+    # Существующая в базе НЕ мутировала
+    cat_doc = mock_client.get_doc(settings.couchdb.categories_db, str(existing_cat_id))
+    assert cat_doc is not None
+    assert cat_doc["name"] == "Оригинал"
+    assert cat_doc["description"] == "Исходное описание"
+
+    # Новая категория создалась в базе categories
+    new_doc = mock_client.get_doc(settings.couchdb.categories_db, str(new_cat.id))
+    assert new_doc is not None
+    assert new_doc["name"] == "Новая категория"
+
+    # UPDATE
+    another_new_cat = Category(name="Вторая новая", slug="second")
+    created.name = "Обновленный товар"
+    updated = repo.update(
+        created,
+        categories=[cat_existing, another_new_cat],
+    )
+    assert updated is not None
+    assert updated.category_ids == [existing_cat_id, another_new_cat.id]
+
+    # Существующая все еще НЕ мутировала
+    cat_doc_after = mock_client.get_doc(
+        settings.couchdb.categories_db, str(existing_cat_id)
+    )
+    assert cat_doc_after is not None
+    assert cat_doc_after["name"] == "Оригинал"
+
+    # Вторая новая создалась
+    sec_doc = mock_client.get_doc(
+        settings.couchdb.categories_db, str(another_new_cat.id)
+    )
+    assert sec_doc is not None
+    assert sec_doc["name"] == "Вторая новая"
+
+
+def test_transition_between_v1_and_v2_on_product_operations() -> None:
+    """Тест: корректный переход товара от версии 1 к 2 и от 2 к 1 при CRUD-операциях."""
+    mock_client = MockCouchDbClient()
+
+    # Шаг 1: Создаем товар в v1 со встроенной категорией
+    settings.app_version = 1
+    repo_v1 = CouchDbProductRepository(client=mock_client)  # type: ignore[arg-type]
+
+    cat_v1 = Category(name="Книги", slug="books", description="Бумажные книги")
+    prod = Product(
+        name="Война и мир",
+        description="Том 1",
+        price=Decimal("500.00"),
+        quantity=5,
+    )
+    saved_v1 = repo_v1.create(prod, categories=[cat_v1])
+    assert saved_v1.category_ids == [cat_v1.id]
+
+    doc_v1 = mock_client.get_doc(settings.couchdb.products_db, str(saved_v1.id))
+    assert doc_v1 is not None
+    assert doc_v1.get("schema_version") == 1
+    assert "categories" in doc_v1
+    assert "category_ids" not in doc_v1
+
+    # Шаг 2: Переключаемся на v2 -> обновляем товар (переход 1 -> 2)
+    settings.app_version = 2
+    repo_v2 = CouchDbProductRepository(client=mock_client)  # type: ignore[arg-type]
+
+    saved_v1.name = "Война и мир (юбилейное издание)"
+    new_cat_v2 = Category(name="Классика", slug="classic", description="Шедевры")
+    updated_v2 = repo_v2.update(saved_v1, categories=[cat_v1, new_cat_v2])
+    assert updated_v2 is not None
+    assert updated_v2.category_ids == [cat_v1.id, new_cat_v2.id]
+
+    doc_v2 = mock_client.get_doc(settings.couchdb.products_db, str(saved_v1.id))
+    assert doc_v2 is not None
+    assert doc_v2.get("schema_version") == 2
+    assert "categories" not in doc_v2
+    assert doc_v2.get("category_ids") == [str(cat_v1.id), str(new_cat_v2.id)]
+
+    # Обе категории должны быть в базе categories_db
+    c1 = mock_client.get_doc(settings.couchdb.categories_db, str(cat_v1.id))
+    c2 = mock_client.get_doc(settings.couchdb.categories_db, str(new_cat_v2.id))
+    assert c1 is not None and c1["name"] == "Книги"
+    assert c2 is not None and c2["name"] == "Классика"
+
+    # Шаг 3: Переключаемся обратно на v1 -> обновляем товар (переход 2 -> 1)
+    settings.app_version = 1
+    updated_v2.description = "Все 4 тома"
+    updated_v1_again = repo_v1.update(updated_v2)
+    assert updated_v1_again is not None
+    assert updated_v1_again.category_ids == [cat_v1.id, new_cat_v2.id]
+
+    doc_v1_again = mock_client.get_doc(settings.couchdb.products_db, str(saved_v1.id))
+    assert doc_v1_again is not None
+    assert doc_v1_again.get("schema_version") == 1
+    assert "category_ids" not in doc_v1_again
+    assert "categories" in doc_v1_again
+    assert len(doc_v1_again["categories"]) == 2
+
+
 if __name__ == "__main__":
     test_product_couchdb_mapper_v1_and_v2()
     print("PASS: test_product_couchdb_mapper_v1_and_v2")
@@ -595,4 +742,8 @@ if __name__ == "__main__":
     print("PASS: test_composite_category_repository")
     test_product_repository_category_delegation()
     print("PASS: test_product_repository_category_delegation")
-    print("\nALL 9 TESTS PASSED SUCCESSFULLY!")
+    test_v2_create_and_update_category_handling()
+    print("PASS: test_v2_create_and_update_category_handling")
+    test_transition_between_v1_and_v2_on_product_operations()
+    print("PASS: test_transition_between_v1_and_v2_on_product_operations")
+    print("\nALL 11 TESTS PASSED SUCCESSFULLY!")

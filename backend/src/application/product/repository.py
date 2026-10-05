@@ -58,16 +58,6 @@ class IProductRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def save(
-        self,
-        product: Product,
-        categories: builtins.list[Category] | None = None,
-        attachments: builtins.list[AttachmentMetadata] | None = None,
-    ) -> Product:
-        """Сохранить товар (upsert: создать или обновить)."""
-        raise NotImplementedError
-
-    @abstractmethod
     def update_stock(self, product_id: UUID, delta: int) -> bool:
         """Изменить остаток товара на складе."""
         raise NotImplementedError
