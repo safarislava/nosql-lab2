@@ -28,16 +28,24 @@ from infrastructure.http.user.controller import router as user_router
 from infrastructure.persistence.couchdb.category_migrator import (
     CategoryMigrator,
 )
-from infrastructure.persistence.couchdb.client import close_couchdb_client
+from infrastructure.persistence.couchdb.client import (
+    CouchDbClient,
+    close_couchdb_client,
+)
+from infrastructure.persistence.couchdb.design_documents import (
+    ensure_validation_design_docs,
+)
 from infrastructure.persistence.postgres.connection import close_postgres_pool, init_db
 from infrastructure.persistence.riak.client import close_riak_client
 
 logger = logging.getLogger(__name__)
 
 
-def _run_auto_migration() -> None:
+def _run_couchdb_init_and_migration() -> None:
     try:
-        migrator = CategoryMigrator()
+        client = CouchDbClient()
+        ensure_validation_design_docs(client)
+        migrator = CategoryMigrator(client=client)
         if settings.app_version >= 2:
             stats = migrator.migrate_all_to_v2()
             if stats.migrated_products > 0:
@@ -55,13 +63,13 @@ def _run_auto_migration() -> None:
                     stats.migrated_categories,
                 )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Ошибка автомиграции CouchDB: %s", exc)
+        logger.warning("Ошибка инициализации/миграции CouchDB: %s", exc)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     init_db()
-    asyncio.create_task(asyncio.to_thread(_run_auto_migration))
+    asyncio.create_task(asyncio.to_thread(_run_couchdb_init_and_migration))
     yield
     close_postgres_pool()
     close_riak_client()

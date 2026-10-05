@@ -27,12 +27,18 @@ os.environ["AUTH__REFRESH_TOKEN_EXPIRE_DAYS"] = "60"
 os.environ["AUTH__COOKIE_SECURE"] = "false"
 os.environ["AUTH__COOKIE_HTTPONLY"] = "true"
 os.environ["AUTH__COOKIE_SAMESITE"] = "lax"
-os.environ["COUCHDB__NODE0_URL"] = os.getenv("COUCHDB__NODE0_URL", "http://localhost:5984")
-os.environ["COUCHDB__NODE1_URL"] = os.getenv("COUCHDB__NODE1_URL", "http://localhost:5985")
+os.environ["COUCHDB__NODE0_URL"] = os.getenv(
+    "COUCHDB__NODE0_URL", "http://localhost:5984"
+)
+os.environ["COUCHDB__NODE1_URL"] = os.getenv(
+    "COUCHDB__NODE1_URL", "http://localhost:5985"
+)
 os.environ["COUCHDB__USER"] = os.getenv("COUCHDB__USER", "admin")
 os.environ["COUCHDB__PASSWORD"] = os.getenv("COUCHDB__PASSWORD", "password")
 os.environ["COUCHDB__PRODUCTS_DB"] = os.getenv("COUCHDB__PRODUCTS_DB", "products_test")
-os.environ["COUCHDB__CATEGORIES_DB"] = os.getenv("COUCHDB__CATEGORIES_DB", "categories_test")
+os.environ["COUCHDB__CATEGORIES_DB"] = os.getenv(
+    "COUCHDB__CATEGORIES_DB", "categories_test"
+)
 os.environ["COUCHDB__TIMEOUT"] = "5.0"
 
 
