@@ -16,6 +16,7 @@ from application.product.repository import IProductRepository
 from domain.attachment import AttachmentMetadata
 from domain.category import Category
 from domain.product import Product
+
 from infrastructure.environment.settings import settings
 from infrastructure.persistence.composite.category_repository import (
     CompositeCategoryRepository,
@@ -133,6 +134,64 @@ class CouchDbProductRepository(IProductRepository):
         docs = self._client.find(self._db, mango_query)
         return [doc_to_product(self._maybe_lazy_migrate(d)) for d in docs]
 
+    def _sync_categories(
+        self,
+        categories: builtins.list[Category],
+    ) -> builtins.list[UUID]:
+        """Обработать категории для v2:
+        - существующие в categories_db категории НЕ должны мутировать;
+        - если категории нет в базе, она создается в categories_db с данными из запроса;
+        - идентификаторы категорий прикрепляются к товару.
+        """
+        if not categories:
+            return []
+
+        unique_cats: dict[str, Category] = {}
+        ordered_ids: builtins.list[UUID] = []
+        for cat in categories:
+            if not cat or not getattr(cat, "id", None):
+                continue
+            cat_id_str = str(cat.id)
+            if cat_id_str not in unique_cats:
+                unique_cats[cat_id_str] = cat
+                ordered_ids.append(cat.id)
+
+        if not unique_cats:
+            return []
+
+        query = CategoryCouchDbMapper.find_by_ids_query(list(unique_cats.keys()))
+        existing_docs = self._client.find(self._categories_db, query)
+        existing_ids = {
+            str(doc["_id"])
+            for doc in existing_docs
+            if doc.get("type") == "category" and "_id" in doc
+        }
+
+        for cat_id_str, cat in unique_cats.items():
+            if cat_id_str not in existing_ids:
+                self._client.save_doc(
+                    self._categories_db,
+                    CategoryCouchDbMapper.to_dict(cat),
+                )
+
+        return ordered_ids
+
+    def _filter_existing_category_ids(
+        self,
+        category_ids: builtins.list[UUID],
+    ) -> builtins.list[UUID]:
+        """Оставить только существующие в categories_db ID категорий (батч-запрос)."""
+        if not category_ids:
+            return []
+        query = CategoryCouchDbMapper.find_by_ids_query(category_ids)
+        existing_docs = self._client.find(self._categories_db, query)
+        existing_ids = {
+            str(doc["_id"])
+            for doc in existing_docs
+            if doc.get("type") == "category" and "_id" in doc
+        }
+        return [cid for cid in category_ids if str(cid) in existing_ids]
+
     def create(
         self,
         product: Product,
@@ -152,15 +211,12 @@ class CouchDbProductRepository(IProductRepository):
         )
 
         if settings.app_version >= 2:
-            if categories:
-                for cat in categories:
-                    self._client.mutate_doc(
-                        self._categories_db,
-                        str(cat.id),
-                        CategoryCouchDbMapper.mutator(cat),
-                        create_if_missing=True,
-                    )
-                product.category_ids = [c.id for c in categories]
+            if categories is not None:
+                product.category_ids = self._sync_categories(categories)
+            elif product.category_ids:
+                product.category_ids = self._filter_existing_category_ids(
+                    product.category_ids
+                )
 
             doc = product_to_doc(
                 product,
@@ -181,6 +237,7 @@ class CouchDbProductRepository(IProductRepository):
                 attachments=embedded_atts,
                 schema_version=1,
             )
+            doc["schema_version"] = 1
             self._client.save_doc(self._db, doc)
 
             product.category_ids = [
@@ -204,26 +261,29 @@ class CouchDbProductRepository(IProductRepository):
     ) -> Product | None:
         """Обновить товар."""
         doc_id = str(product.id)
-        embedded_cats = (
-            [CategoryCouchDbMapper.to_dict(c) for c in categories]
-            if categories is not None
-            else None
-        )
+        existing_doc = self._client.get_doc(self._db, doc_id)
+        if existing_doc is None or existing_doc.get("type") != "product":
+            return None
+        self._maybe_lazy_migrate(existing_doc)
+
         embedded_atts = (
             [AttachmentCouchDbMapper.to_dict(a) for a in attachments]
             if attachments is not None
             else None
         )
 
-        if settings.app_version >= 2 and categories is not None:
-            for cat in categories:
-                self._client.mutate_doc(
-                    self._categories_db,
-                    str(cat.id),
-                    CategoryCouchDbMapper.mutator(cat),
-                    create_if_missing=True,
+        embedded_cats: builtins.list[dict[str, Any]] | None = None
+        if settings.app_version >= 2:
+            if categories is not None:
+                product.category_ids = self._sync_categories(categories)
+            elif product.category_ids:
+                product.category_ids = self._filter_existing_category_ids(
+                    product.category_ids
                 )
-            product.category_ids = [c.id for c in categories]
+        else:
+            if categories is not None:
+                embedded_cats = [CategoryCouchDbMapper.to_dict(c) for c in categories]
+                product.category_ids = [c.id for c in categories]
 
         def mutator(doc: dict[str, Any]) -> bool:
             if doc.get("type") != "product":
@@ -238,10 +298,12 @@ class CouchDbProductRepository(IProductRepository):
                 if product.category_ids is not None:
                     doc["category_ids"] = [str(cid) for cid in product.category_ids]
                 doc.pop("categories", None)
-                doc["schema_version"] = 2
+                doc["schema_version"] = settings.app_version
             else:
                 if embedded_cats is not None:
                     doc["categories"] = embedded_cats
+                doc.pop("category_ids", None)
+                doc["schema_version"] = 1
 
             if embedded_atts is not None:
                 doc["attachments"] = embedded_atts
@@ -250,12 +312,6 @@ class CouchDbProductRepository(IProductRepository):
         if not self._client.mutate_doc(self._db, doc_id, mutator):
             return None
 
-        if embedded_cats is not None and settings.app_version < 2:
-            product.category_ids = [
-                UUID(str(c["id"]))
-                for c in embedded_cats
-                if isinstance(c, dict) and "id" in c
-            ]
         if embedded_atts is not None:
             product.attachment_ids = [
                 UUID(str(a["id"]))
@@ -264,18 +320,6 @@ class CouchDbProductRepository(IProductRepository):
             ]
 
         return product
-
-    def save(
-        self,
-        product: Product,
-        categories: builtins.list[Category] | None = None,
-        attachments: builtins.list[AttachmentMetadata] | None = None,
-    ) -> Product:
-        """Сохранить товар (upsert)."""
-        updated = self.update(product, categories=categories, attachments=attachments)
-        if updated is not None:
-            return updated
-        return self.create(product, categories=categories, attachments=attachments)
 
     def update_stock(self, product_id: UUID, delta: int) -> bool:
         def mutator(doc: dict[str, Any]) -> bool:
