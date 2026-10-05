@@ -9,11 +9,20 @@ from application.category.repository import ICategoryRepository
 from application.category.service import CategoryService
 from application.product.repository import IProductRepository
 from application.product.service import ProductService
+from infrastructure.persistence.composite.category_repository import (
+    CompositeCategoryRepository,
+)
 from infrastructure.persistence.couchdb.attachment_repository import (
     CouchDbAttachmentRepository,
 )
-from infrastructure.persistence.couchdb.category_repository import (
-    CouchDbCategoryRepository,
+from infrastructure.persistence.couchdb.category_embedded_repository import (
+    CouchDbEmbeddedCategoryRepository,
+)
+from infrastructure.persistence.couchdb.category_migrator import (
+    CategoryMigrator,
+)
+from infrastructure.persistence.couchdb.category_referenced_repository import (
+    CouchDbReferencedCategoryRepository,
 )
 from infrastructure.persistence.couchdb.client import get_couchdb_client
 from infrastructure.persistence.couchdb.product_repository import (
@@ -22,13 +31,27 @@ from infrastructure.persistence.couchdb.product_repository import (
 
 
 @cache
-def get_product_repository() -> IProductRepository:
-    return CouchDbProductRepository(client=get_couchdb_client())
+def get_category_migrator() -> CategoryMigrator:
+    return CategoryMigrator(client=get_couchdb_client())
 
 
 @cache
 def get_category_repository() -> ICategoryRepository:
-    return CouchDbCategoryRepository(client=get_couchdb_client())
+    client = get_couchdb_client()
+    return CompositeCategoryRepository(
+        v1_repo=CouchDbEmbeddedCategoryRepository(client=client),
+        v2_repo=CouchDbReferencedCategoryRepository(client=client),
+        migrator=get_category_migrator(),
+        client=client,
+    )
+
+
+@cache
+def get_product_repository() -> IProductRepository:
+    return CouchDbProductRepository(
+        client=get_couchdb_client(),
+        category_repo=get_category_repository(),
+    )
 
 
 @cache

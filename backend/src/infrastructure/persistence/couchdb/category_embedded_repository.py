@@ -17,12 +17,8 @@ from infrastructure.persistence.couchdb.client import CouchDbClient
 logger = logging.getLogger(__name__)
 
 
-class CouchDbCategoryRepository(ICategoryRepository):
-    """Гранулярный CRUD-репозиторий категорий в CouchDB.
-
-    Категории хранятся непосредственно как встроенный массив `categories`
-    внутри документа товара в базе `products`.
-    """
+class CouchDbEmbeddedCategoryRepository(ICategoryRepository):
+    """Репозиторий категорий (встроенный массив в товаре)."""
 
     def __init__(
         self,
@@ -40,7 +36,6 @@ class CouchDbCategoryRepository(ICategoryRepository):
             logger.warning("Не удалось инициализировать базу '%s': %s", self._db, exc)
 
     def get_by_id(self, product_id: UUID, category_id: UUID) -> Category | None:
-        """Получить встроенную категорию товара по ID."""
         doc = self._client.get_doc(self._db, str(product_id))
         if not doc or doc.get("type") != "product":
             return None

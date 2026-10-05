@@ -51,6 +51,7 @@ class CouchDbSettings(BaseModel):
 
 
 class Settings(BaseSettings):
+    app_version: int
     riak: RiakSettings
     postgres: PostgresSettings
     auth: AuthSettings

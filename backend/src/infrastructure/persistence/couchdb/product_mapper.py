@@ -8,16 +8,18 @@ from domain.product import Product
 
 
 class ProductCouchDbMapper:
-    """Маппер товара для CouchDB со встроенными категориями и вложениями (без лишних category_ids/attachment_ids)."""
+    """Маппер товара CouchDB (v1/v2)."""
 
     @staticmethod
     def to_doc(
         product: Product,
         categories: list[dict[str, Any]] | None = None,
         attachments: list[dict[str, Any]] | None = None,
+        *,
+        schema_version: int = 1,
     ) -> dict[str, Any]:
-        """Преобразовать доменный Product во встроенный CouchDB-документ."""
-        return {
+        """Преобразовать Product в CouchDB-документ."""
+        doc: dict[str, Any] = {
             "_id": str(product.id),
             "type": "product",
             "name": product.name,
@@ -25,21 +27,35 @@ class ProductCouchDbMapper:
             "price": float(product.price),
             "price_str": str(product.price),
             "quantity": product.quantity,
-            "categories": categories if categories is not None else [],
             "attachments": attachments if attachments is not None else [],
         }
+        if schema_version >= 2:
+            doc["schema_version"] = schema_version
+            doc["category_ids"] = [str(cid) for cid in product.category_ids] or [
+                str(c["id"])
+                for c in (categories or [])
+                if isinstance(c, dict) and "id" in c
+            ]
+        else:
+            doc["categories"] = categories or []
+
+        return doc
 
     @staticmethod
     def from_doc(doc: dict[str, Any]) -> Product:
-        """Восстановить доменный Product из встроенного документа CouchDB."""
+        """Восстановить Product из документа CouchDB."""
         raw_id = doc.get("id") or doc.get("_id")
         prod_id = UUID(str(raw_id)) if raw_id else uuid4()
 
-        category_ids: list[UUID] = [
-            UUID(str(c["id"]))
-            for c in doc.get("categories", [])
-            if isinstance(c, dict) and "id" in c
-        ]
+        category_ids: list[UUID] = []
+        if doc.get("category_ids"):
+            category_ids = [UUID(str(cid)) for cid in doc["category_ids"] if cid]
+        elif doc.get("categories"):
+            category_ids = [
+                UUID(str(c["id"]))
+                for c in doc["categories"]
+                if isinstance(c, dict) and "id" in c
+            ]
 
         attachment_ids: list[UUID] = [
             UUID(str(a["id"]))

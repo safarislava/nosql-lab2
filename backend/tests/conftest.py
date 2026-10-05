@@ -101,6 +101,10 @@ from infrastructure.http.user.dependencies import (
 from infrastructure.persistence.composite.history_repository import (
     CompositeHistoryRepository,
 )
+from infrastructure.persistence.couchdb.client import get_couchdb_client
+from infrastructure.persistence.couchdb.product_repository import (
+    CouchDbProductRepository,
+)
 from infrastructure.persistence.postgres.connection import (
     get_postgres_pool,
     init_db,
@@ -110,9 +114,6 @@ from infrastructure.persistence.postgres.history_repository import (
 )
 from infrastructure.persistence.postgres.order_repository import (
     PostgresOrderRepository,
-)
-from infrastructure.persistence.postgres.product_repository import (
-    PostgresProductRepository,
 )
 from infrastructure.persistence.postgres.teacher_repository import (
     PostgresTeacherRepository,
@@ -261,8 +262,8 @@ def clean_db_and_riak_between_tests() -> Generator[None]:
 class RepositoriesContainer:
     user_repo: PostgresUserRepository = field(default_factory=PostgresUserRepository)
     session_repo: RiakSessionRepository = field(default_factory=RiakSessionRepository)
-    product_repo: PostgresProductRepository = field(
-        default_factory=PostgresProductRepository
+    product_repo: CouchDbProductRepository = field(
+        default_factory=lambda: CouchDbProductRepository(client=get_couchdb_client())
     )
     cart_repo: RiakCartRepository = field(default_factory=RiakCartRepository)
     favourites_repo: RiakFavouritesRepository = field(
