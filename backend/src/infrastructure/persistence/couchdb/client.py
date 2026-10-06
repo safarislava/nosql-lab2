@@ -484,27 +484,87 @@ class CouchDbClient:
             f"Ошибка запуска репликации ({source} -> {target}): {resp.text}"
         )
 
+    def ensure_system_databases(self) -> None:
+        """Создать стандартные служебные базы CouchDB (_users, _replicator, _global_changes) на всех узлах."""
+        for db in ("_users", "_replicator", "_global_changes"):
+            self.ensure_database(db)
+
+    def ensure_replication_job(
+        self,
+        rep_id: str,
+        source_url: str,
+        target_url: str,
+        *,
+        node: int,
+    ) -> None:
+        """Сохранить персистентный документ репликации в базу _replicator на указанном узле."""
+        try:
+            self.ensure_database("_replicator", node=node)
+            existing = self.get_doc("_replicator", rep_id, node=node)
+            if existing:
+                return
+            doc = {
+                "_id": rep_id,
+                "source": source_url,
+                "target": target_url,
+                "continuous": True,
+                "create_target": True,
+            }
+            self.save_doc("_replicator", doc, node=node)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Не удалось зарегистрировать репликацию %s в _replicator на узле %d: %s",
+                rep_id,
+                node,
+                exc,
+            )
+
     def setup_two_way_replication(self, db: str) -> dict[str, Any]:
         """Настроить двустороннюю непрерывную репликацию между узлами."""
         user = settings.couchdb.user
         password = settings.couchdb.password
-        node0_target = f"http://{user}:{password}@{self.nodes[0].split('://')[-1]}/{quote(db, safe='')}"
-        node1_target = f"http://{user}:{password}@{self.nodes[1].split('://')[-1]}/{quote(db, safe='')}"
+        node0_url = f"http://{user}:{password}@{self.nodes[0].split('://')[-1]}/{quote(db, safe='')}"
+        node1_url = f"http://{user}:{password}@{self.nodes[1].split('://')[-1]}/{quote(db, safe='')}"
 
-        rep0 = self.replicate(
-            source=db,
-            target=node1_target,
-            continuous=True,
-            create_target=True,
+        # 1. Персистентные задания в базе _replicator на обоих узлах
+        self.ensure_replication_job(
+            f"rep_{db}_0_to_1",
+            source_url=node0_url,
+            target_url=node1_url,
             node=0,
         )
-        rep1 = self.replicate(
-            source=db,
-            target=node0_target,
-            continuous=True,
-            create_target=True,
+        self.ensure_replication_job(
+            f"rep_{db}_1_to_0",
+            source_url=node1_url,
+            target_url=node0_url,
             node=1,
         )
+
+        # 2. Немедленный запуск через /_replicate
+        rep0: dict[str, Any] = {}
+        rep1: dict[str, Any] = {}
+        try:
+            rep0 = self.replicate(
+                source=db,
+                target=node1_url,
+                continuous=True,
+                create_target=True,
+                node=0,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("POST /_replicate node 0: %s", exc)
+
+        try:
+            rep1 = self.replicate(
+                source=db,
+                target=node0_url,
+                continuous=True,
+                create_target=True,
+                node=1,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("POST /_replicate node 1: %s", exc)
+
         return {"node0_to_node1": rep0, "node1_to_node0": rep1}
 
     def get_conflicts(self, db: str, doc_id: str, *, node: int = -1) -> list[str]:

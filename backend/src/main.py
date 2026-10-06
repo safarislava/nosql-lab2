@@ -55,9 +55,17 @@ logger = logging.getLogger(__name__)
 def _run_couchdb_init_and_migration() -> None:
     try:
         client = CouchDbClient()
+        client.ensure_system_databases()
         ensure_validation_design_docs(client)
         ensure_product_indexes(client)
         ensure_category_indexes(client)
+        client.setup_two_way_replication(settings.couchdb.products_db)
+        client.setup_two_way_replication(settings.couchdb.categories_db)
+        logger.info(
+            "Автоматическая репликация CouchDB между узлами для '%s' и '%s' настроена",
+            settings.couchdb.products_db,
+            settings.couchdb.categories_db,
+        )
         migrator = CategoryMigrator(client=client)
         if settings.app_version >= 2:
             stats = migrator.migrate_all_to_v2()
