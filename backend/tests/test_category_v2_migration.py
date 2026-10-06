@@ -929,6 +929,100 @@ def test_product_list_filter_by_category() -> None:
     assert multi_names == {"Witcher 3", "Soundtrack CD"}
 
 
+def test_product_service_nested_categories_and_attachments() -> None:
+    """Тест создания и обновления товара с вложенными категориями и вложениями через ProductService."""
+    from application.product.dto import ProductCreateDto
+    from application.product.service import ProductService
+    from domain.attachment import AttachmentMetadata
+    from domain.category import Category
+    from infrastructure.http.product.schemas import (
+        CreateProductRequest,
+        ProductAttachmentInput,
+        ProductCategoryInput,
+        ProductResponse,
+        UpdateProductRequest,
+    )
+
+    mock_client = MockCouchDbClient()
+    settings.app_version = 2
+    repo = CouchDbProductRepository(client=mock_client)  # type: ignore[arg-type]
+    service = ProductService(product_repository=repo)
+
+    # 1. Создание через DTO со вложенными данными
+    cat1 = Category(name="Ноутбуки", slug="laptops")
+    att1 = AttachmentMetadata(
+        filename="manual.pdf", content_type="application/pdf", size_bytes=1024
+    )
+    create_dto = ProductCreateDto(
+        name="MacBook Pro",
+        description="M3 Pro",
+        price=Decimal("199990.00"),
+        quantity=5,
+        categories=[cat1],
+        attachments=[att1],
+    )
+    resp_dto = service.create(create_dto)
+    assert resp_dto.name == "MacBook Pro"
+    assert len(resp_dto.categories) == 1
+    assert resp_dto.categories[0].name == "Ноутбуки"
+    assert len(resp_dto.attachments) == 1
+    assert resp_dto.attachments[0].filename == "manual.pdf"
+
+    # Проверка схемы ProductResponse
+    resp_schema = ProductResponse.from_dto(resp_dto)
+    assert len(resp_schema.categories) == 1
+    assert resp_schema.categories[0].name == "Ноутбуки"
+    assert len(resp_schema.attachments) == 1
+    assert resp_schema.attachments[0].filename == "manual.pdf"
+
+    # 2. Создание через CreateProductRequest (HTTP schema)
+    req = CreateProductRequest(
+        name="Dell XPS",
+        description="Ultrabook",
+        price=Decimal("150000.00"),
+        quantity=3,
+        categories=[
+            ProductCategoryInput(
+                name="Ультрабуки", slug="ultrabooks", description="Тонкие ноутбуки"
+            )
+        ],
+        attachments=[
+            ProductAttachmentInput(
+                filename="photo.png", content_type="image/png", size_bytes=2048
+            )
+        ],
+    )
+    req_dto = req.to_dto()
+    assert len(req_dto.categories) == 1
+    assert req_dto.categories[0].name == "Ультрабуки"
+    assert len(req_dto.attachments) == 1
+    assert req_dto.attachments[0].filename == "photo.png"
+
+    created_prod = service.create(req_dto)
+    assert len(created_prod.categories) == 1
+    assert created_prod.categories[0].name == "Ультрабуки"
+    assert len(created_prod.attachments) == 1
+    assert created_prod.attachments[0].filename == "photo.png"
+
+    # 3. Обновление через UpdateProductRequest (HTTP schema)
+    update_req = UpdateProductRequest(
+        name="Dell XPS 15",
+        categories=[ProductCategoryInput(name="Премиум ноутбуки", slug="premium")],
+        attachments=[
+            ProductAttachmentInput(
+                filename="spec.pdf", content_type="application/pdf", size_bytes=5000
+            )
+        ],
+    )
+    update_dto = update_req.to_dto()
+    updated_prod = service.update(created_prod.id, update_dto)
+    assert updated_prod.name == "Dell XPS 15"
+    assert len(updated_prod.categories) == 1
+    assert updated_prod.categories[0].name == "Премиум ноутбуки"
+    assert len(updated_prod.attachments) == 1
+    assert updated_prod.attachments[0].filename == "spec.pdf"
+
+
 if __name__ == "__main__":
     test_product_couchdb_mapper_v1_and_v2()
     print("PASS: test_product_couchdb_mapper_v1_and_v2")
@@ -958,4 +1052,6 @@ if __name__ == "__main__":
     print("PASS: test_product_list_sorting_all")
     test_product_list_filter_by_category()
     print("PASS: test_product_list_filter_by_category")
-    print("\nALL 14 TESTS PASSED SUCCESSFULLY!")
+    test_product_service_nested_categories_and_attachments()
+    print("PASS: test_product_service_nested_categories_and_attachments")
+    print("\nALL 15 TESTS PASSED SUCCESSFULLY!")

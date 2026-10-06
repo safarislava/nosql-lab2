@@ -47,20 +47,39 @@ class ProductService:
             category_ids=list(dto.category_ids),
             attachment_ids=list(dto.attachment_ids),
         )
-        saved_product = self._product_repository.create(product)
-        return ProductResponseDto.from_domain(saved_product)
+        saved_product = self._product_repository.create(
+            product,
+            categories=dto.categories if dto.categories else None,
+            attachments=dto.attachments if dto.attachments else None,
+        )
+        cats = self._product_repository.get_categories(saved_product.id)
+        atts = self._product_repository.get_attachments(saved_product.id)
+        return ProductResponseDto.from_domain(
+            saved_product, categories=cats, attachments=atts
+        )
 
     def get_by_id(self, product_id: UUID) -> ProductResponseDto:
         product = self._product_repository.get_by_id(product_id)
         if product is None:
             raise ProductNotFoundException(product_id)
-        return ProductResponseDto.from_domain(product)
+        cats = self._product_repository.get_categories(product.id)
+        atts = self._product_repository.get_attachments(product.id)
+        return ProductResponseDto.from_domain(
+            product, categories=cats, attachments=atts
+        )
 
     def get_by_ids(self, product_ids: list[UUID]) -> dict[UUID, ProductResponseDto]:
         if not product_ids:
             return {}
         products = self._product_repository.get_by_ids(product_ids)
-        return {p.id: ProductResponseDto.from_domain(p) for p in products}
+        result: dict[UUID, ProductResponseDto] = {}
+        for p in products:
+            cats = self._product_repository.get_categories(p.id)
+            atts = self._product_repository.get_attachments(p.id)
+            result[p.id] = ProductResponseDto.from_domain(
+                p, categories=cats, attachments=atts
+            )
+        return result
 
     def exists_by_id(self, product_id: UUID) -> bool:
         return self._product_repository.exists_by_id(product_id)
@@ -77,8 +96,15 @@ class ProductService:
             filter_dto = ProductFilterDto()
 
         items = self._product_repository.list(filter_dto=filter_dto)
+        response_items: list[ProductResponseDto] = []
+        for p in items:
+            cats = self._product_repository.get_categories(p.id)
+            atts = self._product_repository.get_attachments(p.id)
+            response_items.append(
+                ProductResponseDto.from_domain(p, categories=cats, attachments=atts)
+            )
         return ProductListResponseDto(
-            items=[ProductResponseDto.from_domain(p) for p in items],
+            items=response_items,
             offset=filter_dto.offset,
             limit=filter_dto.limit,
         )
@@ -112,10 +138,18 @@ class ProductService:
         if dto.attachment_ids is not None:
             product.attachment_ids = list(dto.attachment_ids)
 
-        saved_product = self._product_repository.update(product)
+        saved_product = self._product_repository.update(
+            product,
+            categories=dto.categories,
+            attachments=dto.attachments,
+        )
         if saved_product is None:
             raise ProductNotFoundException(product_id)
-        return ProductResponseDto.from_domain(saved_product)
+        cats = self._product_repository.get_categories(saved_product.id)
+        atts = self._product_repository.get_attachments(saved_product.id)
+        return ProductResponseDto.from_domain(
+            saved_product, categories=cats, attachments=atts
+        )
 
     def add_category(self, product_id: UUID, category_id: UUID) -> ProductResponseDto:
         product = self._product_repository.get_by_id(product_id)

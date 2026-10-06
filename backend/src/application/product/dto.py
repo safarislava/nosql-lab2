@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from uuid import UUID
 
+from domain.attachment import AttachmentMetadata
+from domain.category import Category
 from domain.product import Product
 
 
@@ -13,6 +15,8 @@ class ProductCreateDto:
     quantity: int = 0
     category_ids: list[UUID] = field(default_factory=list)
     attachment_ids: list[UUID] = field(default_factory=list)
+    categories: list[Category] = field(default_factory=list)
+    attachments: list[AttachmentMetadata] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -23,6 +27,8 @@ class ProductUpdateDto:
     quantity: int | None = None
     category_ids: list[UUID] | None = None
     attachment_ids: list[UUID] | None = None
+    categories: list[Category] | None = None
+    attachments: list[AttachmentMetadata] | None = None
 
 
 from enum import StrEnum
@@ -59,9 +65,16 @@ class ProductResponseDto:
     is_in_stock: bool
     category_ids: list[UUID] = field(default_factory=list)
     attachment_ids: list[UUID] = field(default_factory=list)
+    categories: list[Category] = field(default_factory=list)
+    attachments: list[AttachmentMetadata] = field(default_factory=list)
 
     @classmethod
-    def from_domain(cls, product: Product) -> "ProductResponseDto":
+    def from_domain(
+        cls,
+        product: Product,
+        categories: list[Category] | None = None,
+        attachments: list[AttachmentMetadata] | None = None,
+    ) -> "ProductResponseDto":
         return cls(
             id=product.id,
             name=product.name,
@@ -71,6 +84,8 @@ class ProductResponseDto:
             is_in_stock=product.is_in_stock(),
             category_ids=list(product.category_ids),
             attachment_ids=list(product.attachment_ids),
+            categories=list(categories) if categories is not None else [],
+            attachments=list(attachments) if attachments is not None else [],
         )
 
 

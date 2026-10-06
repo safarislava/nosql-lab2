@@ -21,6 +21,12 @@ from infrastructure.http.middleware.authentication_middleware import (
 )
 from infrastructure.http.openapi import generate_openapi_schema
 from infrastructure.http.order.controller import router as order_router
+from infrastructure.http.product.attachment.controller import (
+    router as product_attachments_router,
+)
+from infrastructure.http.product.category.controller import (
+    router as product_categories_router,
+)
 from infrastructure.http.product.controller import router as product_router
 from infrastructure.http.recovery.controller import router as recovery_router
 from infrastructure.http.teacher.controller import router as teacher_router
@@ -93,6 +99,8 @@ app.include_router(health_router, prefix="/api")
 app.include_router(user_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(product_router, prefix="/api")
+app.include_router(product_attachments_router, prefix="/api")
+app.include_router(product_categories_router, prefix="/api")
 app.include_router(favourites_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
 app.include_router(checkout_router, prefix="/api")
