@@ -77,10 +77,36 @@ export function ProductPage() {
     }
   }
 
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   return (
     <section className="detail">
       <div className="card detail__info">
         <h1>{current.name}</h1>
+
+        {/* Категории */}
+        {current.categories && current.categories.length > 0 && (
+          <div className="detail__categories">
+            <span className="control-caption">Категории:</span>
+            <div className="category-chips">
+              {current.categories.map((c) => (
+                <Link
+                  key={c.id ?? c.name}
+                  to={c.id ? `${paths.catalog}?category_ids=${c.id}` : paths.catalog}
+                  className="badge badge-category badge-category--link"
+                  title={c.description || c.name}
+                >
+                  {c.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="price">{formatPrice(current.price)}</div>
         <p>{current.description || "Без описания"}</p>
         <div className={current.is_in_stock ? "stock" : "stock stock--out"}>
@@ -106,7 +132,30 @@ export function ProductPage() {
             {inCart ? "В корзине" : "В корзину"}
           </button>
         </div>
+
+        {/* Вложения товара */}
+        {current.attachments && current.attachments.length > 0 && (
+          <div className="detail__attachments">
+            <h3>Прикрепленные файлы и документы</h3>
+            <div className="attachment-list">
+              {current.attachments.map((att) => (
+                <div key={att.id ?? att.filename} className="attachment-item">
+                  <div className="attachment-item__icon">📎</div>
+                  <div className="attachment-item__meta">
+                    <span className="attachment-item__name">{att.filename}</span>
+                    <span className="attachment-item__info">
+                      {formatFileSize(att.size_bytes ?? 0)} • {att.content_type || "файл"}
+                      {att.description ? ` • ${att.description}` : ""}
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
+
 }

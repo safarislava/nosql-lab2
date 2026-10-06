@@ -29,10 +29,17 @@ export function AdminOrdersPage() {
   }, []);
 
   async function act(kind: "approve" | "reject", orderId: string) {
+    setError("");
     try {
-      if (kind === "approve") await approveOrder(orderId);
-      if (kind === "reject") await rejectOrder(orderId);
-      await load();
+      let updated: Order;
+      if (kind === "approve") {
+        updated = await approveOrder(orderId);
+      } else {
+        updated = await rejectOrder(orderId);
+      }
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: updated.status } : o)),
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось обновить заявку");
     }

@@ -80,6 +80,8 @@ services:
       - ./backend/.env
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend/src:/app/src
     depends_on:
       postgres:
         condition: service_healthy

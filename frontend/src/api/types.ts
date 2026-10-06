@@ -7,6 +7,41 @@ export type User = {
   role: UserRole;
 };
 
+export type Category = {
+  id: string;
+  name: string;
+  slug?: string;
+  description?: string;
+};
+
+export type Attachment = {
+  id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  order: number;
+  upload_date: string;
+  checksum?: string;
+  description?: string;
+};
+
+export type ProductCategoryInput = {
+  id?: string;
+  name: string;
+  slug?: string;
+  description?: string;
+};
+
+export type ProductAttachmentInput = {
+  id?: string;
+  filename: string;
+  content_type?: string;
+  size_bytes?: number;
+  order?: number;
+  checksum?: string;
+  description?: string;
+};
+
 export type Product = {
   id: string;
   name: string;
@@ -16,7 +51,10 @@ export type Product = {
   is_in_stock: boolean;
   is_in_cart?: boolean;
   is_in_favourites?: boolean;
+  categories?: (Category | ProductCategoryInput)[];
+  attachments?: (Attachment | ProductAttachmentInput)[];
 };
+
 
 export type ProductList = {
   items: Product[];
