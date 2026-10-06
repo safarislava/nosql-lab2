@@ -38,6 +38,38 @@ services:
       retries: 30
       start_period: 40s
 
+  couchdb1:
+    image: couchdb:3.4
+    container_name: couchdb1
+    environment:
+      COUCHDB_USER: admin
+      COUCHDB_PASSWORD: password
+    ports:
+      - "5984:5984"
+    volumes:
+      - couchdb1-data:/opt/couchdb/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -f http://127.0.0.1:5984/ >/dev/null || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  couchdb2:
+    image: couchdb:3.4
+    container_name: couchdb2
+    environment:
+      COUCHDB_USER: admin
+      COUCHDB_PASSWORD: password
+    ports:
+      - "5985:5984"
+    volumes:
+      - couchdb2-data:/opt/couchdb/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -f http://127.0.0.1:5984/ >/dev/null || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   backend:
     build:
       context: ./backend
@@ -50,6 +82,10 @@ services:
       postgres:
         condition: service_healthy
       riak:
+        condition: service_healthy
+      couchdb1:
+        condition: service_healthy
+      couchdb2:
         condition: service_healthy
 
   frontend:
@@ -64,3 +100,5 @@ services:
 volumes:
   postgres-data:
   riak-data:
+  couchdb1-data:
+  couchdb2-data:

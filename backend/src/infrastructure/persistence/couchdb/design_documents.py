@@ -94,3 +94,47 @@ def ensure_validation_design_docs(client: CouchDbClient) -> None:
             client.save_design_doc(db, "validation", ddoc)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Не удалось установить валидацию для базы '%s': %s", db, exc)
+
+
+def ensure_product_indexes(client: CouchDbClient) -> None:
+    """Установить необходимые Mango-индексы для базы товаров."""
+    if not hasattr(client, "create_index"):
+        return
+    indexes = [
+        {
+            "index": {"fields": ["orders_count"]},
+            "name": "idx_products_orders_count",
+            "type": "json",
+        },
+        {
+            "index": {"fields": ["price"]},
+            "name": "idx_products_price",
+            "type": "json",
+        },
+        {
+            "index": {"fields": ["name"]},
+            "name": "idx_products_name",
+            "type": "json",
+        },
+        {
+            "index": {"fields": ["created_at"]},
+            "name": "idx_products_created_at",
+            "type": "json",
+        },
+        {
+            "index": {"fields": ["category_ids"]},
+            "name": "idx_products_category_ids",
+            "type": "json",
+        },
+        {
+            "index": {"fields": ["category_ids", "created_at"]},
+            "name": "idx_products_category_created_at",
+            "type": "json",
+        },
+    ]
+    try:
+        client.ensure_database(settings.couchdb.products_db)
+        for idx in indexes:
+            client.create_index(settings.couchdb.products_db, idx)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Не удалось создать индексы для товаров: %s", exc)

@@ -7,7 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from application.category.repository import ICategoryRepository
-from application.product.dto import ProductFilterDto
+from application.product.dto import ProductFilterDto, ProductSortBy
 from application.product.exceptions import (
     ProductAlreadyExistsException,
     ProductNotFoundException,
@@ -104,6 +104,7 @@ class CouchDbProductRepository(IProductRepository):
         selector: dict[str, Any] = {"type": "product"}
         limit = 50
         skip = 0
+        sort: list[dict[str, str]] | None = None
 
         if filter_dto is not None:
             limit = filter_dto.limit
@@ -117,16 +118,40 @@ class CouchDbProductRepository(IProductRepository):
                 selector["quantity"] = {"$gt": 0}
             if filter_dto.query and filter_dto.query.strip():
                 q = re.escape(filter_dto.query.strip())
+                selector["name"] = {"$regex": f"(?i){q}"}
+            if filter_dto.category_ids:
+                cat_ids = [str(cid) for cid in filter_dto.category_ids]
                 selector["$or"] = [
-                    {"name": {"$regex": f"(?i){q}"}},
-                    {"description": {"$regex": f"(?i){q}"}},
+                    {"category_ids": {"$in": cat_ids}},
+                    {"categories": {"$elemMatch": {"id": {"$in": cat_ids}}}},
                 ]
+
+            if filter_dto.sort_by == ProductSortBy.POPULARITY:
+                selector.setdefault("orders_count", {})["$gte"] = 0
+                sort = [{"orders_count": "desc"}]
+            elif filter_dto.sort_by == ProductSortBy.PRICE_ASC:
+                selector.setdefault("price", {})["$gte"] = 0
+                sort = [{"price": "asc"}]
+            elif filter_dto.sort_by == ProductSortBy.PRICE_DESC:
+                selector.setdefault("price", {})["$gte"] = 0
+                sort = [{"price": "desc"}]
+            elif filter_dto.sort_by == ProductSortBy.NAME_ASC:
+                selector.setdefault("name", {})["$gt"] = None
+                sort = [{"name": "asc"}]
+            elif filter_dto.sort_by == ProductSortBy.NAME_DESC:
+                selector.setdefault("name", {})["$gt"] = None
+                sort = [{"name": "desc"}]
+            elif filter_dto.sort_by == ProductSortBy.NEWEST:
+                selector.setdefault("created_at", {})["$gt"] = None
+                sort = [{"created_at": "desc"}]
 
         mango_query: dict[str, Any] = {
             "selector": selector,
             "limit": limit,
             "skip": skip,
         }
+        if sort is not None:
+            mango_query["sort"] = sort
 
         docs = self._client.find(self._db, mango_query)
         return [doc_to_product(self._maybe_lazy_migrate(d)) for d in docs]

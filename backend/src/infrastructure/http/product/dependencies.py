@@ -3,47 +3,15 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from application.attachment.repository import IAttachmentRepository
-from application.attachment.service import AttachmentService
-from application.category.repository import ICategoryRepository
-from application.category.service import CategoryService
 from application.product.repository import IProductRepository
 from application.product.service import ProductService
-from infrastructure.persistence.composite.category_repository import (
-    CompositeCategoryRepository,
-)
-from infrastructure.persistence.couchdb.attachment_repository import (
-    CouchDbAttachmentRepository,
-)
-from infrastructure.persistence.couchdb.category_embedded_repository import (
-    CouchDbEmbeddedCategoryRepository,
-)
-from infrastructure.persistence.couchdb.category_migrator import (
-    CategoryMigrator,
-)
-from infrastructure.persistence.couchdb.category_referenced_repository import (
-    CouchDbReferencedCategoryRepository,
+from infrastructure.http.product.category.dependencies import (
+    get_category_repository,
 )
 from infrastructure.persistence.couchdb.client import get_couchdb_client
 from infrastructure.persistence.couchdb.product_repository import (
     CouchDbProductRepository,
 )
-
-
-@cache
-def get_category_migrator() -> CategoryMigrator:
-    return CategoryMigrator(client=get_couchdb_client())
-
-
-@cache
-def get_category_repository() -> ICategoryRepository:
-    client = get_couchdb_client()
-    return CompositeCategoryRepository(
-        v1_repo=CouchDbEmbeddedCategoryRepository(client=client),
-        v2_repo=CouchDbReferencedCategoryRepository(client=client),
-        migrator=get_category_migrator(),
-        client=client,
-    )
 
 
 @cache
@@ -54,32 +22,7 @@ def get_product_repository() -> IProductRepository:
     )
 
 
-@cache
-def get_attachment_repository() -> IAttachmentRepository:
-    return CouchDbAttachmentRepository(client=get_couchdb_client())
-
-
 ProductRepositoryDep = Annotated[IProductRepository, Depends(get_product_repository)]
-CategoryRepositoryDep = Annotated[ICategoryRepository, Depends(get_category_repository)]
-AttachmentRepositoryDep = Annotated[
-    IAttachmentRepository, Depends(get_attachment_repository)
-]
-
-
-def get_category_service(
-    category_repository: CategoryRepositoryDep,
-) -> CategoryService:
-    return CategoryService(category_repository=category_repository)
-
-
-def get_attachment_service(
-    attachment_repository: AttachmentRepositoryDep,
-) -> AttachmentService:
-    return AttachmentService(attachment_repository=attachment_repository)
-
-
-CategoryServiceDep = Annotated[CategoryService, Depends(get_category_service)]
-AttachmentServiceDep = Annotated[AttachmentService, Depends(get_attachment_service)]
 
 
 def get_product_service(
