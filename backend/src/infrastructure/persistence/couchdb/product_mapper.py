@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
@@ -27,7 +28,9 @@ class ProductCouchDbMapper:
             "price": float(product.price),
             "price_str": str(product.price),
             "quantity": product.quantity,
+            "orders_count": product.orders_count,
             "attachments": attachments if attachments is not None else [],
+            "created_at": product.created_at.isoformat(),
         }
         if schema_version >= 2:
             doc["schema_version"] = schema_version
@@ -65,6 +68,17 @@ class ProductCouchDbMapper:
 
         price_val = doc.get("price_str") or doc.get("price", "0.00")
 
+        created_at_raw = doc.get("created_at")
+        if created_at_raw:
+            try:
+                created_at = datetime.fromisoformat(str(created_at_raw))
+            except ValueError:
+                created_at = datetime.now(UTC)
+        else:
+            created_at = datetime.now(UTC)
+
+        orders_count = int(doc.get("orders_count", 0))
+
         return Product(
             id=prod_id,
             name=str(doc.get("name", "")),
@@ -73,6 +87,8 @@ class ProductCouchDbMapper:
             quantity=int(doc.get("quantity", 0)),
             category_ids=category_ids,
             attachment_ids=attachment_ids,
+            created_at=created_at,
+            orders_count=orders_count,
         )
 
 

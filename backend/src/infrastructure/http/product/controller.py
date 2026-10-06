@@ -53,6 +53,10 @@ def list_products(
         ProductSortBy,
         Query(description="Сортировка товаров"),
     ] = ProductSortBy.POPULARITY,
+    category_ids: Annotated[
+        list[UUID] | None,
+        Query(description="Фильтр по категориям"),
+    ] = None,
     offset: Annotated[
         int,
         Query(ge=0, description="Смещение (offset)"),
@@ -68,6 +72,7 @@ def list_products(
         max_price=max_price,
         in_stock_only=in_stock_only,
         sort_by=sort_by,
+        category_ids=category_ids,
         offset=offset,
         limit=limit,
     )

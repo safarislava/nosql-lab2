@@ -44,23 +44,9 @@ class ProductFilterDto:
     max_price: Decimal | None = None
     in_stock_only: bool = False
     sort_by: ProductSortBy = ProductSortBy.POPULARITY
+    category_ids: list[UUID] | None = None
     offset: int = 0
     limit: int = 50
-
-    def matches(self, product: Product) -> bool:
-        if self.query is not None and self.query.strip():
-            q = self.query.strip().lower()
-            if q not in product.name.lower() and q not in product.description.lower():
-                return False
-        if self.min_price is not None and product.price < self.min_price:
-            return False
-        if self.max_price is not None and product.price > self.max_price:
-            return False
-        return not (self.in_stock_only and not product.is_in_stock())
-
-    def apply(self, products: list[Product]) -> list[Product]:
-        filtered = [p for p in products if self.matches(p)]
-        return filtered[self.offset : self.offset + self.limit]
 
 
 @dataclass(frozen=True)

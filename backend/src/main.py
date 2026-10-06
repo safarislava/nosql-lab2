@@ -33,6 +33,7 @@ from infrastructure.persistence.couchdb.client import (
     close_couchdb_client,
 )
 from infrastructure.persistence.couchdb.design_documents import (
+    ensure_product_indexes,
     ensure_validation_design_docs,
 )
 from infrastructure.persistence.postgres.connection import close_postgres_pool, init_db
@@ -45,6 +46,7 @@ def _run_couchdb_init_and_migration() -> None:
     try:
         client = CouchDbClient()
         ensure_validation_design_docs(client)
+        ensure_product_indexes(client)
         migrator = CategoryMigrator(client=client)
         if settings.app_version >= 2:
             stats = migrator.migrate_all_to_v2()
