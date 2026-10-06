@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CATEGORY_PRESETS,
   detectSchemaVersion,
@@ -24,6 +24,9 @@ export function CategorySelector({
   const [searchResults, setSearchResults] = useState<Category[]>([]);
   const [searching, setSearching] = useState(false);
 
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // Произвольный ввод новой категории
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customName, setCustomName] = useState("");
@@ -34,6 +37,22 @@ export function CategorySelector({
 
   useEffect(() => {
     detectSchemaVersion().then(setSchemaVersion);
+  }, []);
+
+  // Закрытие выпадающего списка при клике вне компонента
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   // Поиск категорий в v2 с дебаунсом
@@ -190,16 +209,20 @@ export function CategorySelector({
             </div>
           ) : (
             /* Режим v2: поиск из базы categories_db */
-            <div className="db-category-search">
+            <div className="db-category-search" ref={containerRef}>
               <input
                 type="text"
                 className="input input--sm"
                 placeholder="Поиск по существующим категориям..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setIsDropdownOpen(true)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsDropdownOpen(true);
+                }}
               />
               {searching && <span className="search-spinner">Поиск...</span>}
-              {searchResults.length > 0 && (
+              {isDropdownOpen && searchResults.length > 0 && (
                 <div className="search-dropdown">
                   {searchResults.map((cat) => {
                     const isSelected = selectedCategories.some(
@@ -210,7 +233,11 @@ export function CategorySelector({
                         key={cat.id}
                         className={`search-dropdown__item ${isSelected ? "is-selected" : ""}`}
                         onClick={() => {
-                          if (!isSelected) handleSelectExisting(cat);
+                          if (!isSelected) {
+                            handleSelectExisting(cat);
+                            setIsDropdownOpen(false);
+                            setSearchQuery("");
+                          }
                         }}
                       >
                         <span className="item-name">{cat.name}</span>
@@ -237,11 +264,6 @@ export function CategorySelector({
             ) : (
               <div className="custom-category-box">
                 <h4>Новая категория</h4>
-                {schemaVersion === 2 && (
-                  <p className="notice notice--warning">
-                    ⚠️ В схеме v2 категория создается в общей базе данных. Название и slug обязательны. Если данные некорректны, категория не применится к товару.
-                  </p>
-                )}
                 {formError && <div className="notice notice--error">{formError}</div>}
                 <div className="custom-fields">
                   <input
