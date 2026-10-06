@@ -603,6 +603,19 @@ paths:
           description: Сортировка товаров
           default: popularity
         description: Сортировка товаров
+      - name: category_ids
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: array
+            items:
+              type: string
+              format: uuid
+          - type: 'null'
+          description: Фильтр по категориям
+          title: Category Ids
+        description: Фильтр по категориям
       - name: offset
         in: query
         required: false
@@ -893,6 +906,428 @@ paths:
       x-required-roles:
       - ADMIN
       description: '**Требуемые роли:** `ADMIN`'
+  /api/products/{product_id}/attachments:
+    get:
+      tags:
+      - Product Attachments
+      summary: Получить список метаданных вложений товара
+      operationId: list_product_attachments_api_products__product_id__attachments_get
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Product Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttachmentResponse'
+                title: Response List Product Attachments Api Products  Product Id  Attachments
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - Product Attachments
+      summary: Добавить вложение к товару
+      operationId: add_product_attachment_api_products__product_id__attachments_post
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Product Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAttachmentRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Пользователь не аутентифицирован.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetailResponse'
+        '403':
+          description: Недостаточно прав доступа для выполнения данной операции.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      x-required-roles:
+      - ADMIN
+      description: '**Требуемые роли:** `ADMIN`'
+  /api/products/{product_id}/attachments/{attachment_id}:
+    patch:
+      tags:
+      - Product Attachments
+      summary: Обновить метаданные вложения товара
+      operationId: update_product_attachment_api_products__product_id__attachments__attachment_id__patch
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Product Id
+      - name: attachment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Attachment Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAttachmentRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Пользователь не аутентифицирован.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetailResponse'
+        '403':
+          description: Недостаточно прав доступа для выполнения данной операции.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      x-required-roles:
+      - ADMIN
+      description: '**Требуемые роли:** `ADMIN`'
+    delete:
+      tags:
+      - Product Attachments
+      summary: Удалить вложение товара
+      operationId: delete_product_attachment_api_products__product_id__attachments__attachment_id__delete
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Product Id
+      - name: attachment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Attachment Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Пользователь не аутентифицирован.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetailResponse'
+        '403':
+          description: Недостаточно прав доступа для выполнения данной операции.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      x-required-roles:
+      - ADMIN
+      description: '**Требуемые роли:** `ADMIN`'
+  /api/products/{product_id}/categories:
+    get:
+      tags:
+      - Product Categories
+      summary: Получить список категорий товара
+      operationId: list_product_categories_api_products__product_id__categories_get
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Product Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryResponse'
+                title: Response List Product Categories Api Products  Product Id  Categories
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - Product Categories
+      summary: Добавить категорию к товару
+      operationId: add_product_category_api_products__product_id__categories_post
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Product Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCategoryRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Пользователь не аутентифицирован.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetailResponse'
+        '403':
+          description: Недостаточно прав доступа для выполнения данной операции.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      x-required-roles:
+      - ADMIN
+      description: '**Требуемые роли:** `ADMIN`'
+  /api/products/{product_id}/categories/{category_id}:
+    patch:
+      tags:
+      - Product Categories
+      summary: Обновить категорию товара
+      operationId: update_product_category_api_products__product_id__categories__category_id__patch
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Product Id
+      - name: category_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Category Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCategoryRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Пользователь не аутентифицирован.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetailResponse'
+        '403':
+          description: Недостаточно прав доступа для выполнения данной операции.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      x-required-roles:
+      - ADMIN
+      description: '**Требуемые роли:** `ADMIN`'
+    delete:
+      tags:
+      - Product Categories
+      summary: Удалить категорию у товара
+      operationId: delete_product_category_api_products__product_id__categories__category_id__delete
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Product Id
+      - name: category_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Category Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Пользователь не аутентифицирован.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetailResponse'
+        '403':
+          description: Недостаточно прав доступа для выполнения данной операции.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetailResponse'
+      security:
+      - BearerAuth: []
+      x-required-roles:
+      - ADMIN
+      description: '**Требуемые роли:** `ADMIN`'
+  /api/categories:
+    get:
+      tags:
+      - Categories
+      summary: Поиск категорий
+      description: Поиск категорий по названию. Доступно только для схемы версии 2.
+        В версии 1 возвращает 400 Bad Request.
+      operationId: search_categories_api_categories_get
+      parameters:
+      - name: query
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Поисковый запрос по названию категории
+          title: Query
+        description: Поисковый запрос по названию категории
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          description: Смещение (offset)
+          default: 0
+          title: Offset
+        description: Смещение (offset)
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          description: Лимит на страницу
+          default: 50
+          title: Limit
+        description: Лимит на страницу
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryResponse'
+                title: Response Search Categories Api Categories Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/users/me/favourites:
     get:
       tags:
@@ -2911,6 +3346,45 @@ components:
       required:
       - student_id
       title: AddStudentRequest
+    AttachmentResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        filename:
+          type: string
+          title: Filename
+        content_type:
+          type: string
+          title: Content Type
+        size_bytes:
+          type: integer
+          title: Size Bytes
+        order:
+          type: integer
+          title: Order
+        upload_date:
+          type: string
+          format: date-time
+          title: Upload Date
+        checksum:
+          type: string
+          title: Checksum
+        description:
+          type: string
+          title: Description
+      type: object
+      required:
+      - id
+      - filename
+      - content_type
+      - size_bytes
+      - order
+      - upload_date
+      - checksum
+      - description
+      title: AttachmentResponse
     BatchAddProductResponse:
       properties:
         product_id:
@@ -3002,6 +3476,28 @@ components:
       - items
       - total_items
       title: CartResponse
+    CategoryResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        slug:
+          type: string
+          title: Slug
+        description:
+          type: string
+          title: Description
+      type: object
+      required:
+      - id
+      - name
+      - slug
+      - description
+      title: CategoryResponse
     ChangePasswordRequest:
       properties:
         old_password:
@@ -3038,6 +3534,62 @@ components:
       - total_orders
       - total_amount
       title: CheckoutResponse
+    CreateAttachmentRequest:
+      properties:
+        filename:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Filename
+        content_type:
+          type: string
+          maxLength: 100
+          title: Content Type
+          default: application/octet-stream
+        size_bytes:
+          type: integer
+          minimum: 0.0
+          title: Size Bytes
+          default: 0
+        order:
+          type: integer
+          minimum: 0.0
+          title: Order
+          default: 0
+        checksum:
+          type: string
+          title: Checksum
+          default: ''
+        description:
+          type: string
+          maxLength: 1000
+          title: Description
+          default: ''
+      type: object
+      required:
+      - filename
+      title: CreateAttachmentRequest
+    CreateCategoryRequest:
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+        slug:
+          type: string
+          maxLength: 255
+          title: Slug
+          default: ''
+        description:
+          type: string
+          maxLength: 1000
+          title: Description
+          default: ''
+      type: object
+      required:
+      - name
+      title: CreateCategoryRequest
     CreateOrderRequest:
       properties:
         product_id:
@@ -3087,6 +3639,16 @@ components:
           default: 0
           examples:
           - 10
+        categories:
+          items:
+            $ref: '#/components/schemas/ProductCategoryInput'
+          type: array
+          title: Categories
+        attachments:
+          items:
+            $ref: '#/components/schemas/ProductAttachmentInput'
+          type: array
+          title: Attachments
       type: object
       required:
       - name
@@ -3311,6 +3873,76 @@ components:
       - REJECTED
       - CANCELLED
       title: OrderStatus
+    ProductAttachmentInput:
+      properties:
+        id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Id
+          description: ID существующего вложения (если есть)
+        filename:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Filename
+        content_type:
+          type: string
+          maxLength: 100
+          title: Content Type
+          default: application/octet-stream
+        size_bytes:
+          type: integer
+          minimum: 0.0
+          title: Size Bytes
+          default: 0
+        order:
+          type: integer
+          minimum: 0.0
+          title: Order
+          default: 0
+        checksum:
+          type: string
+          title: Checksum
+          default: ''
+        description:
+          type: string
+          maxLength: 1000
+          title: Description
+          default: ''
+      type: object
+      required:
+      - filename
+      title: ProductAttachmentInput
+    ProductCategoryInput:
+      properties:
+        id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Id
+          description: ID существующей категории (если есть)
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+        slug:
+          type: string
+          maxLength: 255
+          title: Slug
+          default: ''
+        description:
+          type: string
+          maxLength: 1000
+          title: Description
+          default: ''
+      type: object
+      required:
+      - name
+      title: ProductCategoryInput
     ProductListResponse:
       properties:
         items:
@@ -3360,6 +3992,16 @@ components:
           type: boolean
           title: Is In Favourites
           default: false
+        categories:
+          items:
+            $ref: '#/components/schemas/CategoryResponse'
+          type: array
+          title: Categories
+        attachments:
+          items:
+            $ref: '#/components/schemas/AttachmentResponse'
+          type: array
+          title: Attachments
       type: object
       required:
       - id
@@ -3549,6 +4191,46 @@ components:
       - student_ids
       - total_students
       title: TeacherResponse
+    UpdateAttachmentRequest:
+      properties:
+        filename:
+          anyOf:
+          - type: string
+            maxLength: 255
+            minLength: 1
+          - type: 'null'
+          title: Filename
+        content_type:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Content Type
+        size_bytes:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Size Bytes
+        order:
+          anyOf:
+          - type: integer
+            minimum: 0.0
+          - type: 'null'
+          title: Order
+        checksum:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Checksum
+        description:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+          title: Description
+      type: object
+      title: UpdateAttachmentRequest
     UpdateCartItemRequest:
       properties:
         quantity:
@@ -3560,6 +4242,29 @@ components:
       required:
       - quantity
       title: UpdateCartItemRequest
+    UpdateCategoryRequest:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 255
+            minLength: 1
+          - type: 'null'
+          title: Name
+        slug:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Slug
+        description:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+          title: Description
+      type: object
+      title: UpdateCategoryRequest
     UpdateProductRequest:
       properties:
         name:
@@ -3589,6 +4294,20 @@ components:
             minimum: 0.0
           - type: 'null'
           title: Quantity
+        categories:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ProductCategoryInput'
+            type: array
+          - type: 'null'
+          title: Categories
+        attachments:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ProductAttachmentInput'
+            type: array
+          - type: 'null'
+          title: Attachments
       type: object
       title: UpdateProductRequest
     UpdateUserRequest:

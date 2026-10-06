@@ -11,6 +11,9 @@ from infrastructure.environment.settings import settings
 from infrastructure.http.auth.controller import router as auth_router
 from infrastructure.http.auth.dependencies import get_token_service
 from infrastructure.http.cart.controller import router as cart_router
+from infrastructure.http.category.controller import (
+    router as categories_router,
+)
 from infrastructure.http.checkout.controller import router as checkout_router
 from infrastructure.http.exception_handlers import setup_exception_handlers
 from infrastructure.http.favourites.controller import router as favourites_router
@@ -39,6 +42,7 @@ from infrastructure.persistence.couchdb.client import (
     close_couchdb_client,
 )
 from infrastructure.persistence.couchdb.design_documents import (
+    ensure_category_indexes,
     ensure_product_indexes,
     ensure_validation_design_docs,
 )
@@ -53,6 +57,7 @@ def _run_couchdb_init_and_migration() -> None:
         client = CouchDbClient()
         ensure_validation_design_docs(client)
         ensure_product_indexes(client)
+        ensure_category_indexes(client)
         migrator = CategoryMigrator(client=client)
         if settings.app_version >= 2:
             stats = migrator.migrate_all_to_v2()
@@ -101,6 +106,7 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(product_router, prefix="/api")
 app.include_router(product_attachments_router, prefix="/api")
 app.include_router(product_categories_router, prefix="/api")
+app.include_router(categories_router, prefix="/api")
 app.include_router(favourites_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
 app.include_router(checkout_router, prefix="/api")

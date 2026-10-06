@@ -3,6 +3,9 @@ from __future__ import annotations
 import builtins
 from uuid import UUID
 
+from application.category.exceptions import (
+    CategorySearchNotSupportedInV1Exception,
+)
 from application.category.repository import ICategoryRepository
 from domain.category import Category
 from infrastructure.environment.settings import settings
@@ -74,3 +77,13 @@ class CompositeCategoryRepository(ICategoryRepository):
         category_ids: builtins.list[UUID],
     ) -> builtins.list[UUID]:
         return self._active_repo.filter_existing_category_ids(category_ids)
+
+    def search(
+        self,
+        query: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> builtins.list[Category]:
+        if settings.app_version < 2:
+            raise CategorySearchNotSupportedInV1Exception()
+        return self._v2_repo.search(query=query, offset=offset, limit=limit)

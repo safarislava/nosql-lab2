@@ -28,3 +28,13 @@ class CategoryAlreadyExistsException(CategoryException):
 class EmptyCategoryNameException(CategoryException):
     def __init__(self, message: str = "Название категории не может быть пустым."):
         super().__init__(message)
+
+
+class CategorySearchNotSupportedInV1Exception(CategoryException):
+    status_code: int = 400
+
+    def __init__(
+        self,
+        message: str = "Поиск категорий доступен только для схемы версии 2 или выше.",
+    ):
+        super().__init__(message)

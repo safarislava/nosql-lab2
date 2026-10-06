@@ -82,3 +82,20 @@ class CategoryService:
         if not self._category_repository.delete(product_id, category_id):
             raise CategoryNotFoundException(category_id)
         return True
+
+    def search_categories(
+        self,
+        query: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> CategoryListResponseDto:
+        """Поиск глобальных категорий (только v2)."""
+        categories = self._category_repository.search(
+            query=query,
+            offset=offset,
+            limit=limit,
+        )
+        return CategoryListResponseDto(
+            items=[CategoryResponseDto.from_domain(c) for c in categories],
+            total=len(categories),
+        )

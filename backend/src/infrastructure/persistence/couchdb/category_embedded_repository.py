@@ -5,6 +5,9 @@ import logging
 from typing import Any
 from uuid import UUID
 
+from application.category.exceptions import (
+    CategorySearchNotSupportedInV1Exception,
+)
 from application.category.repository import ICategoryRepository
 from application.product.exceptions import ProductNotFoundException
 from domain.category import Category
@@ -131,3 +134,12 @@ class CouchDbEmbeddedCategoryRepository(ICategoryRepository):
     ) -> builtins.list[UUID]:
         """В схеме v1 внешняя проверка ID не требуется."""
         raise NotImplementedError
+
+    def search(
+        self,
+        query: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> builtins.list[Category]:
+        """В схеме v1 глобальный поиск категорий не поддерживается."""
+        raise CategorySearchNotSupportedInV1Exception()

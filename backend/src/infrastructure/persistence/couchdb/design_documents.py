@@ -138,3 +138,27 @@ def ensure_product_indexes(client: CouchDbClient) -> None:
             client.create_index(settings.couchdb.products_db, idx)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Не удалось создать индексы для товаров: %s", exc)
+
+
+def ensure_category_indexes(client: CouchDbClient) -> None:
+    """Установить необходимые Mango-индексы для базы категорий."""
+    if not hasattr(client, "create_index"):
+        return
+    indexes = [
+        {
+            "index": {"fields": ["name"]},
+            "name": "idx_categories_name",
+            "type": "json",
+        },
+        {
+            "index": {"fields": ["type"]},
+            "name": "idx_categories_type",
+            "type": "json",
+        },
+    ]
+    try:
+        client.ensure_database(settings.couchdb.categories_db)
+        for idx in indexes:
+            client.create_index(settings.couchdb.categories_db, idx)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Не удалось создать индексы для категорий: %s", exc)
