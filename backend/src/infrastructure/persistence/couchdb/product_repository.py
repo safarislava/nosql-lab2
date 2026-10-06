@@ -319,6 +319,9 @@ class CouchDbProductRepository(IProductRepository):
 
         return self._client.mutate_doc(self._db, str(product_id), mutator)
 
+    def decrement_orders_count(self, product_id: UUID, delta: int = 1) -> bool:
+        return self.increment_orders_count(product_id, -delta)
+
     def delete(self, product_id: UUID) -> bool:
         doc_id = str(product_id)
         doc = self._client.get_doc(self._db, doc_id)
