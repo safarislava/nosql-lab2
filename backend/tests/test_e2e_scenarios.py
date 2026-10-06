@@ -215,7 +215,7 @@ class TestEndToEndFunctionalScenarios:
         3. Студент отменяет заказ до его одобрения -> статус CANCELLED, остаток возвращается.
         4. Повторная попытка отмены возвращает ошибку 400.
         """
-        product = repos.product_repo.save(
+        product = repos.product_repo.create(
             Product(
                 name="Микроконтроллер ESP32",
                 description="",

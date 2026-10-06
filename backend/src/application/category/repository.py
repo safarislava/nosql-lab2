@@ -34,3 +34,17 @@ class ICategoryRepository(ABC):
     def delete(self, product_id: UUID, category_id: UUID) -> bool:
         """Удалить категорию из товара по ID."""
         raise NotImplementedError
+
+    @abstractmethod
+    def save_missing_categories(
+        self, categories: builtins.list[Category]
+    ) -> builtins.list[UUID]:
+        """Сохранить только отсутствующие категории в хранилище и вернуть упорядоченный список UUID."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def filter_existing_category_ids(
+        self, category_ids: builtins.list[UUID]
+    ) -> builtins.list[UUID]:
+        """Отфильтровать список ID, оставив только реально существующие."""
+        raise NotImplementedError

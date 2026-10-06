@@ -388,7 +388,7 @@ class TestOrdersFunctional:
             price=sample_product.price + Decimal("999.00"),
             quantity=50,
         )
-        repos.product_repo.save(modified_product)
+        repos.product_repo.update(modified_product)
 
         # Проверяем, что каталог действительно изменился
         catalog_product = repos.product_repo.get_by_id(sample_product.id)

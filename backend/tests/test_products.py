@@ -72,9 +72,9 @@ class TestProductsFunctional:
             price=Decimal("3000.00"),
             quantity=10,
         )
-        repos.product_repo.save(p1)
-        repos.product_repo.save(p2)
-        repos.product_repo.save(p3)
+        repos.product_repo.create(p1)
+        repos.product_repo.create(p2)
+        repos.product_repo.create(p3)
 
         # 1. Поиск по слову "Python"
         resp = client.get("/api/products", params={"query": "Python"})
@@ -419,7 +419,7 @@ class TestProductsFunctional:
             price=Decimal("2000.00"),
             quantity=5,
         )
-        repos.product_repo.save(p2)
+        repos.product_repo.create(p2)
 
         # Пустой список
         assert repos.product_repo.get_by_ids([]) == []

@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from collections.abc import Callable, Sequence
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -30,6 +33,34 @@ class CategoryCouchDbMapper:
             slug=str(data.get("slug", "")),
             description=str(data.get("description", "")),
         )
+
+    @staticmethod
+    def mutator(category: Category) -> Callable[[dict[str, Any]], bool]:
+        """Создать функцию-мутатор для сохранения категории в базу categories."""
+        name = category.name
+        slug = category.slug
+        desc = category.description
+
+        def _mutator(doc: dict[str, Any]) -> bool:
+            doc["type"] = "category"
+            doc["name"] = name
+            doc["slug"] = slug
+            doc["description"] = desc
+            return True
+
+        return _mutator
+
+    @staticmethod
+    def find_by_ids_query(category_ids: Sequence[UUID | str]) -> dict[str, Any]:
+        """Mango-запрос для поиска списка категорий по ID."""
+        cids = [str(cid) for cid in category_ids if cid]
+        return {
+            "selector": {
+                "type": "category",
+                "_id": {"$in": cids},
+            },
+            "limit": len(cids) or 1,
+        }
 
 
 category_to_dict = CategoryCouchDbMapper.to_dict

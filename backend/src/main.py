@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -5,6 +7,7 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI
 
+from infrastructure.environment.settings import settings
 from infrastructure.http.auth.controller import router as auth_router
 from infrastructure.http.auth.dependencies import get_token_service
 from infrastructure.http.cart.controller import router as cart_router
@@ -22,14 +25,51 @@ from infrastructure.http.product.controller import router as product_router
 from infrastructure.http.recovery.controller import router as recovery_router
 from infrastructure.http.teacher.controller import router as teacher_router
 from infrastructure.http.user.controller import router as user_router
-from infrastructure.persistence.couchdb.client import close_couchdb_client
+from infrastructure.persistence.couchdb.category_migrator import (
+    CategoryMigrator,
+)
+from infrastructure.persistence.couchdb.client import (
+    CouchDbClient,
+    close_couchdb_client,
+)
+from infrastructure.persistence.couchdb.design_documents import (
+    ensure_validation_design_docs,
+)
 from infrastructure.persistence.postgres.connection import close_postgres_pool, init_db
 from infrastructure.persistence.riak.client import close_riak_client
+
+logger = logging.getLogger(__name__)
+
+
+def _run_couchdb_init_and_migration() -> None:
+    try:
+        client = CouchDbClient()
+        ensure_validation_design_docs(client)
+        migrator = CategoryMigrator(client=client)
+        if settings.app_version >= 2:
+            stats = migrator.migrate_all_to_v2()
+            if stats.migrated_products > 0:
+                logger.info(
+                    "Автомиграция CouchDB (v1 -> v2): обновлено %d товаров, перенесено %d категорий",
+                    stats.migrated_products,
+                    stats.migrated_categories,
+                )
+        else:
+            stats = migrator.migrate_all_to_v1()
+            if stats.migrated_products > 0:
+                logger.info(
+                    "Автомиграция CouchDB (v2 -> v1): обновлено %d товаров, возвращено %d категорий",
+                    stats.migrated_products,
+                    stats.migrated_categories,
+                )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Ошибка инициализации/миграции CouchDB: %s", exc)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     init_db()
+    asyncio.create_task(asyncio.to_thread(_run_couchdb_init_and_migration))
     yield
     close_postgres_pool()
     close_riak_client()

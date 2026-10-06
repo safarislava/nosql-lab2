@@ -22,12 +22,12 @@ class TestCheckoutFunctional:
         repos: RepositoriesContainer,
     ) -> None:
         """Основной поток: успешное оформление заказа из корзины с несколькими товарами."""
-        p1 = repos.product_repo.save(
+        p1 = repos.product_repo.create(
             Product(
                 name="Учебник 1", description="", price=Decimal("1000.00"), quantity=10
             )
         )
-        p2 = repos.product_repo.save(
+        p2 = repos.product_repo.create(
             Product(
                 name="Учебник 2", description="", price=Decimal("500.00"), quantity=5
             )
