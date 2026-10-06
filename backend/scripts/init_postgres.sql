@@ -46,8 +46,7 @@ CREATE TABLE IF NOT EXISTS orders
     product_snapshot JSONB          NOT NULL,
     status           VARCHAR(50)    NOT NULL,
     created_at       TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_orders_user_created ON orders (user_id, created_at DESC);
