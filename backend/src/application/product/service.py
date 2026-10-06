@@ -258,3 +258,6 @@ class ProductService:
             raise ProductNotFoundException(product_id)
 
         return ProductResponseDto.from_domain(updated_product)
+
+    def increment_orders_count(self, product_id: UUID, delta: int = 1) -> bool:
+        return self._product_repository.increment_orders_count(product_id, delta)

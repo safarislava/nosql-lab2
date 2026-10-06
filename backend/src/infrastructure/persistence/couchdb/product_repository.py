@@ -309,6 +309,16 @@ class CouchDbProductRepository(IProductRepository):
             return None
         return self.get_by_id(product_id)
 
+    def increment_orders_count(self, product_id: UUID, delta: int = 1) -> bool:
+        def mutator(doc: dict[str, Any]) -> bool:
+            if doc.get("type") != "product":
+                return False
+            current_count = int(doc.get("orders_count", 0))
+            doc["orders_count"] = max(0, current_count + delta)
+            return True
+
+        return self._client.mutate_doc(self._db, str(product_id), mutator)
+
     def delete(self, product_id: UUID) -> bool:
         doc_id = str(product_id)
         doc = self._client.get_doc(self._db, doc_id)
