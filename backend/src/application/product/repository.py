@@ -73,6 +73,10 @@ class IProductRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def decrement_orders_count(self, product_id: UUID, delta: int = 1) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
     def delete(self, product_id: UUID) -> bool:
         """Удалить товар."""
         raise NotImplementedError
