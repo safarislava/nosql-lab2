@@ -28,6 +28,7 @@ export function Header() {
         {isAdmin ? <NavLink to={paths.products}>Товары</NavLink> : null}
         {isAdmin ? <NavLink to={paths.allOrders}>Все заявки</NavLink> : null}
         {isAdmin ? <NavLink to={paths.user}>Пользователь</NavLink> : null}
+        {isAdmin ? <NavLink to={paths.analytics}>Аналитика</NavLink> : null}
       </nav>
       <div className="header__user">
         <NavLink to={paths.profile}>{user?.name}</NavLink>

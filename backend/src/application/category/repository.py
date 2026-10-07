@@ -48,3 +48,13 @@ class ICategoryRepository(ABC):
     ) -> builtins.list[UUID]:
         """Отфильтровать список ID, оставив только реально существующие."""
         raise NotImplementedError
+
+    @abstractmethod
+    def search(
+        self,
+        query: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> builtins.list[Category]:
+        """Поиск глобальных категорий в хранилище (только для версии схемы 2)."""
+        raise NotImplementedError

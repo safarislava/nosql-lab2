@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
@@ -14,6 +15,7 @@ from infrastructure.http.middleware.authentication_middleware import (
 )
 from infrastructure.http.product.schemas import (
     CreateProductRequest,
+    ProductAnalyticsResponse,
     ProductListResponse,
     ProductResponse,
     StockOperationRequest,
@@ -57,6 +59,14 @@ def list_products(
         list[UUID] | None,
         Query(description="Фильтр по категориям"),
     ] = None,
+    created_from: Annotated[
+        datetime | None,
+        Query(description="Дата создания от, включительно"),
+    ] = None,
+    created_to: Annotated[
+        datetime | None,
+        Query(description="Дата создания до, включительно"),
+    ] = None,
     offset: Annotated[
         int,
         Query(ge=0, description="Смещение (offset)"),
@@ -73,11 +83,24 @@ def list_products(
         in_stock_only=in_stock_only,
         sort_by=sort_by,
         category_ids=category_ids,
+        created_from=created_from,
+        created_to=created_to,
         offset=offset,
         limit=limit,
     )
     result = service.list(filter_dto)
     return ProductListResponse.from_dto(result)
+
+
+@router.get(
+    "/analytics",
+    dependencies=[require_roles(UserRole.ADMIN)],
+    response_model=ProductAnalyticsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Среднее количество изменений товара по состояниям наличия",
+)
+def get_product_analytics(service: ProductServiceDep) -> ProductAnalyticsResponse:
+    return ProductAnalyticsResponse.from_stats(service.average_changes_by_state())
 
 
 @router.post(

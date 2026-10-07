@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Callable
+from datetime import UTC, datetime
 from functools import cache
 from types import TracebackType
 from typing import Any, Self
@@ -20,6 +21,19 @@ from .exceptions import (
 
 logger = logging.getLogger(__name__)
 
+_CONFLICT_META = {"_conflicts", "_revisions", "_deleted_conflicts"}
+
+
+def first_write_stamp(doc: dict[str, Any]) -> str:
+    """Момент первой записи ветки. Пустое значение старше любой метки."""
+    raw = doc.get("updated_at") or doc.get("created_at") or ""
+    return str(raw)
+
+
+def select_first_write(branches: list[dict[str, Any]]) -> dict[str, Any]:
+    """Выбрать ветку с самым ранним временем записи."""
+    return min(branches, key=first_write_stamp)
+
 
 class CouchDbClient:
     """HTTP-клиент для Apache CouchDB с поддержкой шардирования и отказоустойчивости."""
@@ -27,6 +41,7 @@ class CouchDbClient:
     def __init__(self) -> None:
         self.nodes: list[str] = [url.rstrip("/") for url in settings.couchdb.nodes]
         self.timeout = settings.couchdb.timeout
+        self._products_changed_listeners: list[Callable[[], None]] = []
         self._clients: dict[str, httpx.Client] = {
             url: httpx.Client(
                 base_url=url,
@@ -52,6 +67,24 @@ class CouchDbClient:
         exc_tb: TracebackType | None,
     ) -> None:
         self.close()
+
+    def add_products_changed_listener(self, listener: Callable[[], None]) -> None:
+        """Подписать сброс кэша на успешную запись или удаление товара."""
+        if listener not in self._products_changed_listeners:
+            self._products_changed_listeners.append(listener)
+
+    def _notify_products_changed(self, db: str, doc_id: str) -> None:
+        if db != settings.couchdb.products_db or doc_id.startswith("_design/"):
+            return
+        for listener in tuple(self._products_changed_listeners):
+            try:
+                listener()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Не удалось обработать изменение товара '%s': %s",
+                    doc_id,
+                    exc,
+                )
 
     def get_node_for_doc(self, doc_id: str) -> int:
         """Целевой узел для doc_id: hash(doc_id) % len(nodes) -> 0 или 1."""
@@ -187,6 +220,24 @@ class CouchDbClient:
             f"Ошибка при получении документа '{doc_id}': {resp.text}"
         )
 
+    def get_all_docs(
+        self,
+        db: str,
+        *,
+        include_docs: bool = False,
+        node: int = -1,
+    ) -> list[dict[str, Any]]:
+        """Строки `_all_docs`: id документа и value.rev."""
+        params: dict[str, str] = {}
+        if include_docs:
+            params["include_docs"] = "true"
+        path = f"/{quote(db, safe='')}/_all_docs"
+        resp = self._request("GET", path, node=node, params=params)
+        if resp.status_code == 200:
+            rows = resp.json().get("rows", [])
+            return rows if isinstance(rows, list) else []
+        raise CouchDbException(f"Ошибка чтения _all_docs базы '{db}': {resp.text}")
+
     def save_doc(
         self,
         db: str,
@@ -212,7 +263,10 @@ class CouchDbClient:
             resp = self._request("POST", path, node=node, json=doc, params=params)
 
         if resp.status_code in (200, 201, 202):
-            return resp.json()
+            body = resp.json()
+            saved_id = str(body.get("id") or doc_id)
+            self._notify_products_changed(db, saved_id)
+            return body
 
         if resp.status_code == 409:
             raise CouchDbConflictException(doc_id or "unknown", resp.text)
@@ -233,7 +287,10 @@ class CouchDbClient:
     ) -> bool:
         """Атомарно модифицировать документ с повторами при MVCC-конфликтах."""
         for _ in range(max_retries):
-            doc = self.get_doc(db, doc_id)
+            try:
+                doc = self.resolve_conflicts_fww(db, doc_id)
+            except CouchDbConflictException:
+                continue
             if doc is None:
                 if not create_if_missing:
                     return False
@@ -242,6 +299,7 @@ class CouchDbClient:
             if not mutator(doc):
                 return False
 
+            doc["updated_at"] = datetime.now(UTC).isoformat()
             try:
                 self.save_doc(db, doc)
                 return True
@@ -267,6 +325,7 @@ class CouchDbClient:
         )
 
         if resp.status_code in (200, 202):
+            self._notify_products_changed(db, doc_id)
             return True
         if resp.status_code == 404:
             return False
@@ -484,27 +543,87 @@ class CouchDbClient:
             f"Ошибка запуска репликации ({source} -> {target}): {resp.text}"
         )
 
+    def ensure_system_databases(self) -> None:
+        """Создать стандартные служебные базы CouchDB (_users, _replicator, _global_changes) на всех узлах."""
+        for db in ("_users", "_replicator", "_global_changes"):
+            self.ensure_database(db)
+
+    def ensure_replication_job(
+        self,
+        rep_id: str,
+        source_url: str,
+        target_url: str,
+        *,
+        node: int,
+    ) -> None:
+        """Сохранить персистентный документ репликации в базу _replicator на указанном узле."""
+        try:
+            self.ensure_database("_replicator", node=node)
+            existing = self.get_doc("_replicator", rep_id, node=node)
+            if existing:
+                return
+            doc = {
+                "_id": rep_id,
+                "source": source_url,
+                "target": target_url,
+                "continuous": True,
+                "create_target": True,
+            }
+            self.save_doc("_replicator", doc, node=node)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Не удалось зарегистрировать репликацию %s в _replicator на узле %d: %s",
+                rep_id,
+                node,
+                exc,
+            )
+
     def setup_two_way_replication(self, db: str) -> dict[str, Any]:
         """Настроить двустороннюю непрерывную репликацию между узлами."""
         user = settings.couchdb.user
         password = settings.couchdb.password
-        node0_target = f"http://{user}:{password}@{self.nodes[0].split('://')[-1]}/{quote(db, safe='')}"
-        node1_target = f"http://{user}:{password}@{self.nodes[1].split('://')[-1]}/{quote(db, safe='')}"
+        node0_url = f"http://{user}:{password}@{self.nodes[0].split('://')[-1]}/{quote(db, safe='')}"
+        node1_url = f"http://{user}:{password}@{self.nodes[1].split('://')[-1]}/{quote(db, safe='')}"
 
-        rep0 = self.replicate(
-            source=db,
-            target=node1_target,
-            continuous=True,
-            create_target=True,
+        # 1. Персистентные задания в базе _replicator на обоих узлах
+        self.ensure_replication_job(
+            f"rep_{db}_0_to_1",
+            source_url=node0_url,
+            target_url=node1_url,
             node=0,
         )
-        rep1 = self.replicate(
-            source=db,
-            target=node0_target,
-            continuous=True,
-            create_target=True,
+        self.ensure_replication_job(
+            f"rep_{db}_1_to_0",
+            source_url=node1_url,
+            target_url=node0_url,
             node=1,
         )
+
+        # 2. Немедленный запуск через /_replicate
+        rep0: dict[str, Any] = {}
+        rep1: dict[str, Any] = {}
+        try:
+            rep0 = self.replicate(
+                source=db,
+                target=node1_url,
+                continuous=True,
+                create_target=True,
+                node=0,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("POST /_replicate node 0: %s", exc)
+
+        try:
+            rep1 = self.replicate(
+                source=db,
+                target=node0_url,
+                continuous=True,
+                create_target=True,
+                node=1,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("POST /_replicate node 1: %s", exc)
+
         return {"node0_to_node1": rep0, "node1_to_node0": rep1}
 
     def get_conflicts(self, db: str, doc_id: str, *, node: int = -1) -> list[str]:
@@ -513,6 +632,46 @@ class CouchDbClient:
         if not doc:
             return []
         return doc.get("_conflicts", [])
+
+    def resolve_conflicts_fww(
+        self,
+        db: str,
+        doc_id: str,
+        *,
+        node: int = -1,
+    ) -> dict[str, Any] | None:
+        """Оставить ветку с самым ранним updated_at и удалить остальные."""
+        current = self.get_doc(db, doc_id, conflicts=True, node=node)
+        if current is None:
+            return None
+
+        losing_revs = [str(rev) for rev in current.get("_conflicts") or [] if rev]
+        if not losing_revs:
+            current.pop("_conflicts", None)
+            return current
+
+        branches = [current]
+        for rev in losing_revs:
+            old = self.get_doc(db, doc_id, rev=rev, node=node)
+            if old is not None:
+                branches.append(old)
+
+        chosen = select_first_write(branches)
+        winner = {
+            key: value for key, value in chosen.items() if key not in _CONFLICT_META
+        }
+        winner["_id"] = current["_id"]
+        winner["_rev"] = current["_rev"]
+        self.resolve_conflict(db, doc_id, winner, losing_revs, node=node)
+        logger.warning(
+            "FWW: документ '%s' в '%s', оставлена запись %s, удалены ревизии %s",
+            doc_id,
+            db,
+            first_write_stamp(chosen) or "<без метки>",
+            ", ".join(losing_revs),
+        )
+        resolved = self.get_doc(db, doc_id, node=node)
+        return resolved if resolved is not None else winner
 
     def resolve_conflict(
         self,

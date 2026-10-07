@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from application.product.analytics_cache import IProductAnalyticsCache
 from application.product.repository import IProductRepository
 from application.product.service import ProductService
 from infrastructure.http.product.category.dependencies import (
@@ -12,6 +13,16 @@ from infrastructure.persistence.couchdb.client import get_couchdb_client
 from infrastructure.persistence.couchdb.product_repository import (
     CouchDbProductRepository,
 )
+from infrastructure.persistence.riak.product_analytics_cache import (
+    RiakProductAnalyticsCache,
+)
+
+
+@cache
+def get_product_analytics_cache() -> IProductAnalyticsCache:
+    cache = RiakProductAnalyticsCache()
+    get_couchdb_client().add_products_changed_listener(cache.invalidate)
+    return cache
 
 
 @cache
@@ -30,6 +41,7 @@ def get_product_service(
 ) -> ProductService:
     return ProductService(
         product_repository=product_repository,
+        analytics_cache=get_product_analytics_cache(),
     )
 
 

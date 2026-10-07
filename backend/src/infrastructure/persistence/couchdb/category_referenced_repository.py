@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 import logging
+import re
 from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
@@ -167,3 +168,23 @@ class CouchDbReferencedCategoryRepository(ICategoryRepository):
         """Оставить только существующие в categories_db ID категорий (батч-запрос)."""
         existing_ids = self._find_existing_ids(category_ids)
         return [cid for cid in category_ids if str(cid) in existing_ids]
+
+    def search(
+        self,
+        query: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> builtins.list[Category]:
+        """Поиск категорий по имени в categories_db."""
+        selector: dict[str, Any] = {"type": "category"}
+        if query and query.strip():
+            escaped = re.escape(query.strip())
+            selector["name"] = {"$regex": f"(?i){escaped}"}
+
+        find_query: dict[str, Any] = {
+            "selector": selector,
+            "skip": offset,
+            "limit": limit,
+        }
+        docs = self._client.find(self._categories_db, find_query)
+        return [CategoryCouchDbMapper.from_dict(d) for d in docs]

@@ -29,7 +29,17 @@ export function ProductCard({
         <h2>
           <Link to={href}>{product.name}</Link>
         </h2>
+        {product.categories && product.categories.length > 0 && (
+          <div className="product-card__categories">
+            {product.categories.slice(0, 3).map((c) => (
+              <span key={c.id ?? c.name} className="badge badge--category-mini">
+                {c.name}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="price">{formatPrice(product.price)}</div>
+
         <div className={product.is_in_stock ? "stock" : "stock stock--out"}>
           {product.is_in_stock ? `В наличии: ${product.quantity}` : "Нет в наличии"}
         </div>

@@ -3,10 +3,15 @@ from decimal import Decimal
 from typing import Any
 from uuid import uuid4
 
+from application.category.exceptions import (
+    CategorySearchNotSupportedInV1Exception,
+)
+from application.category.service import CategoryService
 from application.product.dto import ProductFilterDto, ProductSortBy
 from domain.category import Category
 from domain.product import Product
 from infrastructure.environment.settings import settings
+from infrastructure.http.category.controller import search_categories
 from infrastructure.persistence.composite.category_repository import (
     CompositeCategoryRepository,
 )
@@ -37,6 +42,15 @@ class MockCouchDbClient:
     def ensure_database(self, db: str) -> None:
         if db not in self.dbs:
             self.dbs[db] = {}
+
+    def resolve_conflicts_fww(
+        self,
+        db: str,
+        doc_id: str,
+        *,
+        node: int = -1,
+    ) -> dict[str, Any] | None:
+        return self.get_doc(db, doc_id)
 
     def get_doc(self, db: str, doc_id: str) -> dict[str, Any] | None:
         self.ensure_database(db)
@@ -106,6 +120,10 @@ class MockCouchDbClient:
         def match_predicate(doc: dict[str, Any], k: str, v: Any) -> bool:
             if k == "type":
                 return doc.get("type") == v
+            if k == "name" and isinstance(v, dict) and "$regex" in v:
+                import re
+
+                return bool(re.search(v["$regex"], doc.get("name", "")))
             if k == "_id" and isinstance(v, dict) and "$in" in v:
                 return doc.get("_id") in v["$in"]
             if k == "categories.0" and isinstance(v, dict) and "$exists" in v:
@@ -169,6 +187,15 @@ class MockCouchDbClient:
         limit = query.get("limit", 100)
         skip = query.get("skip", 0)
         return results[skip : skip + limit]
+
+    def explain(self, db: str, query: dict[str, Any]) -> dict[str, Any]:
+        self.last_explain = {"db": db, "query": query}
+        return {
+            "index": {
+                "name": "idx_products_category_created_at",
+                "type": "json",
+            }
+        }
 
 
 def test_product_couchdb_mapper_v1_and_v2() -> None:
@@ -1023,6 +1050,130 @@ def test_product_service_nested_categories_and_attachments() -> None:
     assert updated_prod.attachments[0].filename == "spec.pdf"
 
 
+def test_category_search_v2_and_v1_restriction() -> None:
+    """Тест эндпоинта и логики поиска категорий:
+    - в v2 поиск работает по подстроке и возвращает результаты;
+    - пагинация (offset, limit) поддерживается;
+    - в v1 поиск категорий запрещен и выбрасывает исключение CategorySearchNotSupportedInV1Exception.
+    """
+    mock_client = MockCouchDbClient()
+    v1_repo = CouchDbEmbeddedCategoryRepository(client=mock_client)  # type: ignore[arg-type]
+    v2_repo = CouchDbReferencedCategoryRepository(client=mock_client)  # type: ignore[arg-type]
+    migrator = CategoryMigrator(client=mock_client)  # type: ignore[arg-type]
+    composite_repo = CompositeCategoryRepository(
+        v1_repo=v1_repo,
+        v2_repo=v2_repo,
+        migrator=migrator,
+        client=mock_client,  # type: ignore[arg-type]
+    )
+    service = CategoryService(category_repository=composite_repo)
+
+    # Заполняем категории в v2
+    cat1 = Category(name="Ноутбуки", slug="laptops", description="Все ноутбуки")
+    cat2 = Category(name="Ультрабуки", slug="ultrabooks", description="Тонкие ноутбуки")
+    cat3 = Category(
+        name="Смартфоны", slug="smartphones", description="Мобильные телефоны"
+    )
+    v2_repo.save_missing_categories([cat1, cat2, cat3])
+
+    # 1. Проверяем v2 режим
+    settings.app_version = 2
+
+    # Поиск по подстроке "бук" (без учета регистра) -> должен найти Ноутбуки и Ультрабуки
+    results = service.search_categories(query="бук")
+    assert results.total == 2
+    names = {c.name for c in results.items}
+    assert names == {"Ноутбуки", "Ультрабуки"}
+
+    # Поиск по подстроке "ноут" -> должен найти только Ноутбуки
+    results_laptops = service.search_categories(query="ноут")
+    assert results_laptops.total == 1
+    assert results_laptops.items[0].name == "Ноутбуки"
+
+    # Поиск по подстроке "смарт" -> должен найти только Смартфоны
+    results_smart = service.search_categories(query="смарт")
+    assert results_smart.total == 1
+    assert results_smart.items[0].name == "Смартфоны"
+
+    # Листинг всех категорий без фильтра
+    all_cats = service.search_categories()
+    assert all_cats.total == 3
+
+    # Пагинация
+    paginated = service.search_categories(offset=1, limit=1)
+    assert paginated.total == 1
+
+    # Вызов HTTP контроллера в v2
+    http_resp = search_categories(service=service, query="бук", offset=0, limit=10)
+    assert len(http_resp) == 2
+    assert {c.name for c in http_resp} == {"Ноутбуки", "Ультрабуки"}
+
+    # 2. Проверяем v1 режим (должно быть запрещено)
+    settings.app_version = 1
+
+    try:
+        service.search_categories(query="ноут")
+        assert False, (
+            "Ожидалось исключение CategorySearchNotSupportedInV1Exception в v1"
+        )
+    except CategorySearchNotSupportedInV1Exception as exc:
+        assert exc.status_code == 400
+
+    try:
+        search_categories(service=service, query="ноут", offset=0, limit=10)
+        assert False, (
+            "Ожидалось исключение CategorySearchNotSupportedInV1Exception в HTTP контроллере для v1"
+        )
+    except CategorySearchNotSupportedInV1Exception as exc:
+        assert exc.status_code == 400
+
+    # Возвращаем v2
+    settings.app_version = 2
+
+
+def test_product_list_category_and_created_at_uses_composite_index() -> None:
+    """Одна категория и диапазон дат строят селектор составного индекса."""
+    from datetime import datetime
+
+    mock_client = MockCouchDbClient()
+    settings.app_version = 2
+    repo = CouchDbProductRepository(client=mock_client)  # type: ignore[arg-type]
+
+    category_id = uuid4()
+    created_from = datetime(2026, 1, 1, tzinfo=UTC)
+    created_to = datetime(2026, 2, 1, tzinfo=UTC)
+    repo.list(
+        ProductFilterDto(
+            category_ids=[category_id],
+            created_from=created_from,
+            created_to=created_to,
+            sort_by=ProductSortBy.PRICE_ASC,
+        )
+    )
+
+    selector = mock_client.last_query["selector"]
+    assert selector["category_ids"] == {"$eq": str(category_id)}
+    assert selector["created_at"] == {
+        "$gte": created_from.isoformat(),
+        "$lt": datetime(2026, 2, 2, tzinfo=UTC).isoformat(),
+    }
+    assert "$or" not in selector
+    assert "price" not in selector
+    assert mock_client.last_query["sort"] == [
+        {"category_ids": "asc"},
+        {"created_at": "asc"},
+    ]
+    assert mock_client.last_explain["query"] == mock_client.last_query
+
+    repo.list(
+        ProductFilterDto(
+            category_ids=[category_id, uuid4()],
+            created_from=created_from,
+        )
+    )
+    assert "$or" in mock_client.last_query["selector"]
+
+
 if __name__ == "__main__":
     test_product_couchdb_mapper_v1_and_v2()
     print("PASS: test_product_couchdb_mapper_v1_and_v2")
@@ -1052,6 +1203,10 @@ if __name__ == "__main__":
     print("PASS: test_product_list_sorting_all")
     test_product_list_filter_by_category()
     print("PASS: test_product_list_filter_by_category")
+    test_product_list_category_and_created_at_uses_composite_index()
+    print("PASS: test_product_list_category_and_created_at_uses_composite_index")
     test_product_service_nested_categories_and_attachments()
     print("PASS: test_product_service_nested_categories_and_attachments")
-    print("\nALL 15 TESTS PASSED SUCCESSFULLY!")
+    test_category_search_v2_and_v1_restriction()
+    print("PASS: test_category_search_v2_and_v1_restriction")
+    print("\nALL 16 TESTS PASSED SUCCESSFULLY!")

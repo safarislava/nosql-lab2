@@ -27,3 +27,10 @@ export function roleLabel(role: UserRole): string {
       return role;
   }
 }
+
+export function formatBytes(bytes: number): string {
+  if (!bytes || bytes <= 0) return "0 Б";
+  const units = ["Б", "КБ", "МБ", "ГБ"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i] || "Б"}`;
+}

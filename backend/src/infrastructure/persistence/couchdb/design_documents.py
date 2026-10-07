@@ -49,6 +49,29 @@ function(newDoc, oldDoc, userCtx, secObj) {
 }
 """.strip()
 
+PRODUCT_CHANGES_BY_STATE_MAP_JS = """
+function(doc) {
+    if (doc._deleted) {
+        return;
+    }
+    if (!doc.type || doc.type !== 'product') {
+        return;
+    }
+    var generation = 1;
+    if (typeof doc._rev === 'string') {
+        var parsed = parseInt(doc._rev.split('-')[0], 10);
+        if (!isNaN(parsed) && parsed > 0) {
+            generation = parsed;
+        }
+    }
+    var changes = generation - 1;
+    var state = (typeof doc.quantity === 'number' && doc.quantity > 0)
+        ? 'in_stock'
+        : 'out_of_stock';
+    emit(state, changes);
+}
+""".strip()
+
 CATEGORY_VALIDATE_DOC_UPDATE_JS = """
 function(newDoc, oldDoc, userCtx, secObj) {
     if (newDoc._id && newDoc._id.indexOf('_design/') === 0) {
@@ -96,6 +119,34 @@ def ensure_validation_design_docs(client: CouchDbClient) -> None:
             logger.warning("Не удалось установить валидацию для базы '%s': %s", db, exc)
 
 
+def ensure_product_analytics_view(client: CouchDbClient) -> None:
+    """Установить MapReduce-view среднего числа правок товара по состояниям."""
+    db = settings.couchdb.products_db
+    view = {
+        "map": PRODUCT_CHANGES_BY_STATE_MAP_JS,
+        "reduce": "_stats",
+    }
+    try:
+        client.ensure_database(db)
+        existing = client.get_design_doc(db, "analytics")
+        views = (existing or {}).get("views") or {}
+        current = views.get("changes_by_state") or {}
+        same_map = current.get("map") == view["map"]
+        same_reduce = current.get("reduce") == view["reduce"]
+        if same_map and same_reduce:
+            return
+
+        ddoc = {
+            "language": "javascript",
+            "views": {"changes_by_state": view},
+        }
+        if existing and existing.get("_rev"):
+            ddoc["_rev"] = existing["_rev"]
+        client.save_design_doc(db, "analytics", ddoc)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Не удалось установить аналитический view товаров: %s", exc)
+
+
 def ensure_product_indexes(client: CouchDbClient) -> None:
     """Установить необходимые Mango-индексы для базы товаров."""
     if not hasattr(client, "create_index"):
@@ -138,3 +189,27 @@ def ensure_product_indexes(client: CouchDbClient) -> None:
             client.create_index(settings.couchdb.products_db, idx)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Не удалось создать индексы для товаров: %s", exc)
+
+
+def ensure_category_indexes(client: CouchDbClient) -> None:
+    """Установить необходимые Mango-индексы для базы категорий."""
+    if not hasattr(client, "create_index"):
+        return
+    indexes = [
+        {
+            "index": {"fields": ["name"]},
+            "name": "idx_categories_name",
+            "type": "json",
+        },
+        {
+            "index": {"fields": ["type"]},
+            "name": "idx_categories_type",
+            "type": "json",
+        },
+    ]
+    try:
+        client.ensure_database(settings.couchdb.categories_db)
+        for idx in indexes:
+            client.create_index(settings.couchdb.categories_db, idx)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Не удалось создать индексы для категорий: %s", exc)

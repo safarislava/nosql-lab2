@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, useRoutes, type RouteObject } from "react-rout
 import { AuthProvider } from "./auth/AuthContext";
 import { ProtectedLayout } from "./components/ProtectedLayout";
 import { RoleLayout } from "./components/RoleGate";
+import { AdminAnalyticsPage } from "./pages/AdminAnalyticsPage";
 import { AdminOrdersPage } from "./pages/AdminOrdersPage";
 import { AdminProductsPage } from "./pages/AdminProductsPage";
 import { AdminUserPage } from "./pages/AdminUserPage";
@@ -58,6 +59,7 @@ function AppRoutes() {
             { path: "products", element: <AdminProductsPage /> },
             { path: "all-orders", element: <AdminOrdersPage /> },
             { path: "user", element: <AdminUserPage /> },
+            { path: "analytics", element: <AdminAnalyticsPage /> },
           ],
         },
       ],

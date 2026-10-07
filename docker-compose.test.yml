@@ -1,4 +1,4 @@
-name: nosql_lab1_test
+name: nosql_lab2_test
 
 services:
   postgres-test:

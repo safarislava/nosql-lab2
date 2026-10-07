@@ -31,6 +31,7 @@ class ProductCouchDbMapper:
             "orders_count": product.orders_count,
             "attachments": attachments if attachments is not None else [],
             "created_at": product.created_at.isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
         if schema_version >= 2:
             doc["schema_version"] = schema_version

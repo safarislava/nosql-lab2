@@ -8,7 +8,7 @@ from domain.attachment import AttachmentMetadata
 from domain.category import Category
 from domain.product import Product
 
-from .dto import ProductFilterDto
+from .dto import ProductFilterDto, ProductStateChangesDto
 
 
 class IProductRepository(ABC):
@@ -68,6 +68,15 @@ class IProductRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def increment_orders_count(self, product_id: UUID, delta: int = 1) -> bool:
+        """Увеличить счетчик заказов товара."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def decrement_orders_count(self, product_id: UUID, delta: int = 1) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
     def delete(self, product_id: UUID) -> bool:
         """Удалить товар."""
         raise NotImplementedError
@@ -104,4 +113,9 @@ class IProductRepository(ABC):
         self, product_id: UUID, attachment_id: UUID
     ) -> Product | None:
         """Удалить встроенное вложение из товара."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def average_changes_by_state(self) -> builtins.list[ProductStateChangesDto]:
+        """Среднее число правок товара по состояниям наличия."""
         raise NotImplementedError

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -51,6 +52,8 @@ class ProductFilterDto:
     in_stock_only: bool = False
     sort_by: ProductSortBy = ProductSortBy.POPULARITY
     category_ids: list[UUID] | None = None
+    created_from: datetime | None = None
+    created_to: datetime | None = None
     offset: int = 0
     limit: int = 50
 
@@ -94,3 +97,17 @@ class ProductListResponseDto:
     items: list[ProductResponseDto]
     offset: int
     limit: int
+
+
+IN_STOCK_STATE = "in_stock"
+OUT_OF_STOCK_STATE = "out_of_stock"
+PRODUCT_STOCK_STATES = (IN_STOCK_STATE, OUT_OF_STOCK_STATE)
+
+
+@dataclass(frozen=True)
+class ProductStateChangesDto:
+    """Среднее число правок товаров в одном состоянии наличия."""
+
+    state: str
+    average_changes: float
+    product_count: int

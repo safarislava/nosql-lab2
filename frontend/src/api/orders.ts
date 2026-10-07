@@ -2,9 +2,12 @@ import { api } from "./client";
 import type { Order, OrderList, OrderStatus } from "./types";
 
 export function listMyOrders(status?: OrderStatus): Promise<OrderList> {
-  const search = new URLSearchParams({ limit: "50" });
+  const search = new URLSearchParams({ limit: "50", _t: String(Date.now()) });
   if (status) search.set("status", status);
-  return api<OrderList>(`/api/users/me/orders?${search.toString()}`);
+  return api<OrderList>(`/api/users/me/orders?${search.toString()}`, {
+    cache: "no-store",
+    headers: { "Cache-Control": "no-cache" },
+  });
 }
 
 export function cancelOrder(orderId: string): Promise<Order> {
@@ -14,9 +17,12 @@ export function cancelOrder(orderId: string): Promise<Order> {
 }
 
 export function listAllOrders(status?: OrderStatus): Promise<OrderList> {
-  const search = new URLSearchParams({ limit: "50" });
+  const search = new URLSearchParams({ limit: "50", _t: String(Date.now()) });
   if (status) search.set("status", status);
-  return api<OrderList>(`/api/orders?${search.toString()}`);
+  return api<OrderList>(`/api/orders?${search.toString()}`, {
+    cache: "no-store",
+    headers: { "Cache-Control": "no-cache" },
+  });
 }
 
 export function approveOrder(orderId: string): Promise<Order> {

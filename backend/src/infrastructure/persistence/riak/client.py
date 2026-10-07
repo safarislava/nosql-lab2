@@ -22,6 +22,10 @@ def _build_kv_url(bucket: str, key: str, bucket_type: str = "default") -> str:
     return f"/types/{bucket_type}/buckets/{bucket}/keys/{key}"
 
 
+def _build_bucket_props_url(bucket: str, bucket_type: str = "default") -> str:
+    return f"/types/{bucket_type}/buckets/{bucket}/props"
+
+
 def _build_datatype_url(bucket: str, key: str, bucket_type: str) -> str:
     return f"/types/{bucket_type}/buckets/{bucket}/datatypes/{key}"
 
@@ -80,6 +84,21 @@ class RiakClient:
             key=key,
             data=response.json(),
             bucket_type=bucket_type,
+        )
+
+    def set_bucket_props(
+        self,
+        bucket: str,
+        props: dict[str, Any],
+        bucket_type: str = "default",
+    ) -> None:
+        """Задать свойства бакета, в том числе TTL объектов."""
+        url = _build_bucket_props_url(bucket, bucket_type)
+        self._request(
+            "PUT",
+            url,
+            json={"props": props},
+            headers={"Content-Type": "application/json"},
         )
 
     def put(self, obj: RiakObject) -> RiakObject:

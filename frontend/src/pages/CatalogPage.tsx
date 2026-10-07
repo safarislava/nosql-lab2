@@ -1,8 +1,13 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  CATEGORY_PRESETS,
+  detectSchemaVersion,
+  searchCategories,
+} from "../api/categories";
 import { PAGE_SIZE, listProducts } from "../api/products";
 import { addFavourite, removeFavourite, setCartQuantity } from "../api/shop";
-import type { Product, ProductSortBy } from "../api/types";
+import type { Category, Product, ProductSortBy } from "../api/types";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ProductCard } from "../components/ProductCard";
@@ -29,13 +34,21 @@ export function CatalogPage() {
       max_price: params.get("max_price") ?? "",
       in_stock_only: params.get("in_stock_only") === "true",
       sort_by: (params.get("sort_by") as ProductSortBy) || "popularity",
+      category_ids: params.getAll("category_ids"),
+      created_from: params.get("created_from") ?? "",
+      created_to: params.get("created_to") ?? "",
     }),
     [params],
   );
 
+  const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
+
+
   const [draftQuery, setDraftQuery] = useState(filters.query);
   const [draftMin, setDraftMin] = useState(filters.min_price);
   const [draftMax, setDraftMax] = useState(filters.max_price);
+  const [draftCreatedFrom, setDraftCreatedFrom] = useState(filters.created_from);
+  const [draftCreatedTo, setDraftCreatedTo] = useState(filters.created_to);
   const [items, setItems] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -47,6 +60,8 @@ export function CatalogPage() {
     setDraftQuery(filters.query);
     setDraftMin(filters.min_price);
     setDraftMax(filters.max_price);
+    setDraftCreatedFrom(filters.created_from);
+    setDraftCreatedTo(filters.created_to);
   }, [filters]);
 
   useEffect(() => {
@@ -73,16 +88,51 @@ export function CatalogPage() {
     };
   }, [filters]);
 
+  useEffect(() => {
+    detectSchemaVersion().then((ver) => {
+      if (ver === 2) {
+        searchCategories()
+          .then(setAvailableCategories)
+          .catch(() => {
+            setAvailableCategories(CATEGORY_PRESETS);
+          });
+      } else {
+        setAvailableCategories(CATEGORY_PRESETS);
+      }
+    });
+  }, []);
+
+  function toggleCategory(categoryId: string) {
+    const current = new Set(filters.category_ids);
+    if (current.has(categoryId)) {
+      current.delete(categoryId);
+    } else {
+      current.add(categoryId);
+    }
+    const next = new URLSearchParams(params);
+    next.delete("category_ids");
+    for (const cid of current) {
+      next.append("category_ids", cid);
+    }
+    setParams(next);
+  }
+
   function applyFilters(event: FormEvent) {
     event.preventDefault();
     const next = new URLSearchParams();
     if (draftQuery.trim()) next.set("query", draftQuery.trim());
     if (draftMin) next.set("min_price", draftMin);
     if (draftMax) next.set("max_price", draftMax);
+    if (draftCreatedFrom) next.set("created_from", draftCreatedFrom);
+    if (draftCreatedTo) next.set("created_to", draftCreatedTo);
     if (filters.in_stock_only) next.set("in_stock_only", "true");
     next.set("sort_by", filters.sort_by);
+    for (const cid of filters.category_ids) {
+      next.append("category_ids", cid);
+    }
     setParams(next);
   }
+
 
   function patchParams(patch: Record<string, string | boolean>) {
     const next = new URLSearchParams(params);
@@ -173,6 +223,22 @@ export function CatalogPage() {
           />
         </label>
         <label className="field">
+          <span>Создан с</span>
+          <input
+            type="date"
+            value={draftCreatedFrom}
+            onChange={(event) => setDraftCreatedFrom(event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span>Создан по</span>
+          <input
+            type="date"
+            value={draftCreatedTo}
+            onChange={(event) => setDraftCreatedTo(event.target.value)}
+          />
+        </label>
+        <label className="field">
           <span>Сортировка</span>
           <select
             value={filters.sort_by}
@@ -201,6 +267,43 @@ export function CatalogPage() {
           Найти
         </button>
       </form>
+
+      {availableCategories.length > 0 && (
+        <div className="card category-filters">
+          <div className="category-filters__header">
+            <span className="control-caption">Фильтр по категориям:</span>
+            {filters.category_ids.length > 0 && (
+              <button
+                type="button"
+                className="btn btn--link btn--sm"
+                onClick={() => {
+                  const next = new URLSearchParams(params);
+                  next.delete("category_ids");
+                  setParams(next);
+                }}
+              >
+                Сбросить категории
+              </button>
+            )}
+          </div>
+          <div className="category-filters__list">
+            {availableCategories.map((cat) => {
+              const active = filters.category_ids.includes(cat.id);
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  className={`btn btn--sm ${active ? "btn--primary is-active" : "btn--outline"}`}
+                  onClick={() => toggleCategory(cat.id)}
+                >
+                  {cat.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
 
       {error ? <p className="error">{error}</p> : null}
 

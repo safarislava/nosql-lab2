@@ -7,6 +7,7 @@ from application.product.dto import (
     ProductCreateDto,
     ProductListResponseDto,
     ProductResponseDto,
+    ProductStateChangesDto,
     ProductUpdateDto,
 )
 from infrastructure.http.product.attachment.schemas import (
@@ -138,6 +139,31 @@ class ProductResponse(BaseModel):
             is_in_favourites=is_in_favourites,
             categories=cats,
             attachments=atts,
+        )
+
+
+class ProductStateChangesResponse(BaseModel):
+    state: str
+    average_changes: float
+    product_count: int
+
+
+class ProductAnalyticsResponse(BaseModel):
+    by_state: list[ProductStateChangesResponse]
+
+    @classmethod
+    def from_stats(
+        cls, stats: list[ProductStateChangesDto]
+    ) -> "ProductAnalyticsResponse":
+        return cls(
+            by_state=[
+                ProductStateChangesResponse(
+                    state=item.state,
+                    average_changes=item.average_changes,
+                    product_count=item.product_count,
+                )
+                for item in stats
+            ]
         )
 
 

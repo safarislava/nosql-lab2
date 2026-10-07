@@ -31,9 +31,12 @@ export function OrdersPage() {
   }, []);
 
   async function onCancel(orderId: string) {
+    setError("");
     try {
-      await cancelOrder(orderId);
-      await load();
+      const updated = await cancelOrder(orderId);
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: updated.status } : o)),
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось отменить заявку");
     }

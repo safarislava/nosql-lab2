@@ -4,6 +4,7 @@ from uuid import UUID
 
 from application.attachment.dto import AttachmentResponseDto
 from application.category.dto import CategoryResponseDto
+from application.product.analytics_cache import IProductAnalyticsCache
 from domain.product import Product
 
 from .dto import (
@@ -11,6 +12,7 @@ from .dto import (
     ProductFilterDto,
     ProductListResponseDto,
     ProductResponseDto,
+    ProductStateChangesDto,
     ProductUpdateDto,
 )
 from .exceptions import (
@@ -28,8 +30,10 @@ class ProductService:
     def __init__(
         self,
         product_repository: IProductRepository,
+        analytics_cache: IProductAnalyticsCache | None = None,
     ) -> None:
         self._product_repository = product_repository
+        self._analytics_cache = analytics_cache
 
     def create(self, dto: ProductCreateDto) -> ProductResponseDto:
         if not dto.name.strip():
@@ -258,3 +262,25 @@ class ProductService:
             raise ProductNotFoundException(product_id)
 
         return ProductResponseDto.from_domain(updated_product)
+
+    def increment_orders_count(self, product_id: UUID, delta: int = 1) -> bool:
+        return self._product_repository.increment_orders_count(product_id, delta)
+
+    def decrement_orders_count(self, product_id: UUID, delta: int = 1) -> bool:
+        return self._product_repository.decrement_orders_count(product_id, delta)
+
+    def average_changes_by_state(self) -> builtins.list[ProductStateChangesDto]:
+        """Среднее число правок товара по состояниям наличия.
+
+        Повторный вызов в пределах TTL отдаёт значение из кэша.
+        Запись товара сбрасывает кэш отдельно, на клиенте CouchDB.
+        """
+        if self._analytics_cache is not None:
+            cached = self._analytics_cache.get()
+            if cached is not None:
+                return cached
+
+        stats = self._product_repository.average_changes_by_state()
+        if self._analytics_cache is not None:
+            self._analytics_cache.set(stats)
+        return stats
