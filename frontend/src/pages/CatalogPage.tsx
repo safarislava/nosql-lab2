@@ -35,6 +35,8 @@ export function CatalogPage() {
       in_stock_only: params.get("in_stock_only") === "true",
       sort_by: (params.get("sort_by") as ProductSortBy) || "popularity",
       category_ids: params.getAll("category_ids"),
+      created_from: params.get("created_from") ?? "",
+      created_to: params.get("created_to") ?? "",
     }),
     [params],
   );
@@ -45,6 +47,8 @@ export function CatalogPage() {
   const [draftQuery, setDraftQuery] = useState(filters.query);
   const [draftMin, setDraftMin] = useState(filters.min_price);
   const [draftMax, setDraftMax] = useState(filters.max_price);
+  const [draftCreatedFrom, setDraftCreatedFrom] = useState(filters.created_from);
+  const [draftCreatedTo, setDraftCreatedTo] = useState(filters.created_to);
   const [items, setItems] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -56,6 +60,8 @@ export function CatalogPage() {
     setDraftQuery(filters.query);
     setDraftMin(filters.min_price);
     setDraftMax(filters.max_price);
+    setDraftCreatedFrom(filters.created_from);
+    setDraftCreatedTo(filters.created_to);
   }, [filters]);
 
   useEffect(() => {
@@ -117,6 +123,8 @@ export function CatalogPage() {
     if (draftQuery.trim()) next.set("query", draftQuery.trim());
     if (draftMin) next.set("min_price", draftMin);
     if (draftMax) next.set("max_price", draftMax);
+    if (draftCreatedFrom) next.set("created_from", draftCreatedFrom);
+    if (draftCreatedTo) next.set("created_to", draftCreatedTo);
     if (filters.in_stock_only) next.set("in_stock_only", "true");
     next.set("sort_by", filters.sort_by);
     for (const cid of filters.category_ids) {
@@ -212,6 +220,22 @@ export function CatalogPage() {
             min={0}
             value={draftMax}
             onChange={(event) => setDraftMax(event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span>Создан с</span>
+          <input
+            type="date"
+            value={draftCreatedFrom}
+            onChange={(event) => setDraftCreatedFrom(event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span>Создан по</span>
+          <input
+            type="date"
+            value={draftCreatedTo}
+            onChange={(event) => setDraftCreatedTo(event.target.value)}
           />
         </label>
         <label className="field">

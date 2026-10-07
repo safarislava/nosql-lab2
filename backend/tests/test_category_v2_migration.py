@@ -179,6 +179,15 @@ class MockCouchDbClient:
         skip = query.get("skip", 0)
         return results[skip : skip + limit]
 
+    def explain(self, db: str, query: dict[str, Any]) -> dict[str, Any]:
+        self.last_explain = {"db": db, "query": query}
+        return {
+            "index": {
+                "name": "idx_products_category_created_at",
+                "type": "json",
+            }
+        }
+
 
 def test_product_couchdb_mapper_v1_and_v2() -> None:
     """Тест маппера для v1 и v2."""
@@ -1113,6 +1122,49 @@ def test_category_search_v2_and_v1_restriction() -> None:
     settings.app_version = 2
 
 
+def test_product_list_category_and_created_at_uses_composite_index() -> None:
+    """Одна категория и диапазон дат строят селектор составного индекса."""
+    from datetime import datetime
+
+    mock_client = MockCouchDbClient()
+    settings.app_version = 2
+    repo = CouchDbProductRepository(client=mock_client)  # type: ignore[arg-type]
+
+    category_id = uuid4()
+    created_from = datetime(2026, 1, 1, tzinfo=UTC)
+    created_to = datetime(2026, 2, 1, tzinfo=UTC)
+    repo.list(
+        ProductFilterDto(
+            category_ids=[category_id],
+            created_from=created_from,
+            created_to=created_to,
+            sort_by=ProductSortBy.PRICE_ASC,
+        )
+    )
+
+    selector = mock_client.last_query["selector"]
+    assert selector["category_ids"] == {"$eq": str(category_id)}
+    assert selector["created_at"] == {
+        "$gte": created_from.isoformat(),
+        "$lt": datetime(2026, 2, 2, tzinfo=UTC).isoformat(),
+    }
+    assert "$or" not in selector
+    assert "price" not in selector
+    assert mock_client.last_query["sort"] == [
+        {"category_ids": "asc"},
+        {"created_at": "asc"},
+    ]
+    assert mock_client.last_explain["query"] == mock_client.last_query
+
+    repo.list(
+        ProductFilterDto(
+            category_ids=[category_id, uuid4()],
+            created_from=created_from,
+        )
+    )
+    assert "$or" in mock_client.last_query["selector"]
+
+
 if __name__ == "__main__":
     test_product_couchdb_mapper_v1_and_v2()
     print("PASS: test_product_couchdb_mapper_v1_and_v2")
@@ -1142,6 +1194,8 @@ if __name__ == "__main__":
     print("PASS: test_product_list_sorting_all")
     test_product_list_filter_by_category()
     print("PASS: test_product_list_filter_by_category")
+    test_product_list_category_and_created_at_uses_composite_index()
+    print("PASS: test_product_list_category_and_created_at_uses_composite_index")
     test_product_service_nested_categories_and_attachments()
     print("PASS: test_product_service_nested_categories_and_attachments")
     test_category_search_v2_and_v1_restriction()

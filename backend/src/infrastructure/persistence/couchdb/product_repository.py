@@ -3,6 +3,7 @@ from __future__ import annotations
 import builtins
 import logging
 import re
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -47,6 +48,30 @@ from infrastructure.persistence.couchdb.product_mapper import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _created_at_lower_iso(value: datetime) -> str:
+    """Нижняя граница даты в том же ISO-формате, что и поле created_at."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.isoformat()
+
+
+def _created_at_upper_iso(value: datetime) -> str:
+    """Верхняя граница, исключающая следующий момент.
+
+    Календарный день без времени включает весь этот день.
+    """
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    if (
+        value.hour == 0
+        and value.minute == 0
+        and value.second == 0
+        and value.microsecond == 0
+    ):
+        value = value + timedelta(days=1)
+    return value.isoformat()
 
 
 class CouchDbProductRepository(IProductRepository):
@@ -110,6 +135,7 @@ class CouchDbProductRepository(IProductRepository):
         limit = 50
         skip = 0
         sort: list[dict[str, str]] | None = None
+        use_category_date_index = False
 
         if filter_dto is not None:
             limit = filter_dto.limit
@@ -124,31 +150,44 @@ class CouchDbProductRepository(IProductRepository):
             if filter_dto.query and filter_dto.query.strip():
                 q = re.escape(filter_dto.query.strip())
                 selector["name"] = {"$regex": f"(?i){q}"}
-            if filter_dto.category_ids:
+
+            use_category_date_index = self._uses_category_date_index(filter_dto)
+            if use_category_date_index:
+                category_ids = filter_dto.category_ids or []
+                selector["category_ids"] = {"$eq": str(category_ids[0])}
+                created_at: dict[str, str] = {}
+                if filter_dto.created_from is not None:
+                    created_at["$gte"] = _created_at_lower_iso(filter_dto.created_from)
+                if filter_dto.created_to is not None:
+                    created_at["$lt"] = _created_at_upper_iso(filter_dto.created_to)
+                selector["created_at"] = created_at
+                sort = [{"category_ids": "asc"}, {"created_at": "asc"}]
+            elif filter_dto.category_ids:
                 cat_ids = [str(cid) for cid in filter_dto.category_ids]
                 selector["$or"] = [
                     {"category_ids": {"$in": cat_ids}},
                     {"categories": {"$elemMatch": {"id": {"$in": cat_ids}}}},
                 ]
 
-            if filter_dto.sort_by == ProductSortBy.POPULARITY:
-                selector.setdefault("orders_count", {})["$gte"] = 0
-                sort = [{"orders_count": "desc"}]
-            elif filter_dto.sort_by == ProductSortBy.PRICE_ASC:
-                selector.setdefault("price", {})["$gte"] = 0
-                sort = [{"price": "asc"}]
-            elif filter_dto.sort_by == ProductSortBy.PRICE_DESC:
-                selector.setdefault("price", {})["$gte"] = 0
-                sort = [{"price": "desc"}]
-            elif filter_dto.sort_by == ProductSortBy.NAME_ASC:
-                selector.setdefault("name", {})["$gt"] = None
-                sort = [{"name": "asc"}]
-            elif filter_dto.sort_by == ProductSortBy.NAME_DESC:
-                selector.setdefault("name", {})["$gt"] = None
-                sort = [{"name": "desc"}]
-            elif filter_dto.sort_by == ProductSortBy.NEWEST:
-                selector.setdefault("created_at", {})["$gt"] = None
-                sort = [{"created_at": "desc"}]
+            if not use_category_date_index:
+                if filter_dto.sort_by == ProductSortBy.POPULARITY:
+                    selector.setdefault("orders_count", {})["$gte"] = 0
+                    sort = [{"orders_count": "desc"}]
+                elif filter_dto.sort_by == ProductSortBy.PRICE_ASC:
+                    selector.setdefault("price", {})["$gte"] = 0
+                    sort = [{"price": "asc"}]
+                elif filter_dto.sort_by == ProductSortBy.PRICE_DESC:
+                    selector.setdefault("price", {})["$gte"] = 0
+                    sort = [{"price": "desc"}]
+                elif filter_dto.sort_by == ProductSortBy.NAME_ASC:
+                    selector.setdefault("name", {})["$gt"] = None
+                    sort = [{"name": "asc"}]
+                elif filter_dto.sort_by == ProductSortBy.NAME_DESC:
+                    selector.setdefault("name", {})["$gt"] = None
+                    sort = [{"name": "desc"}]
+                elif filter_dto.sort_by == ProductSortBy.NEWEST:
+                    selector.setdefault("created_at", {})["$gt"] = None
+                    sort = [{"created_at": "desc"}]
 
         mango_query: dict[str, Any] = {
             "selector": selector,
@@ -158,8 +197,43 @@ class CouchDbProductRepository(IProductRepository):
         if sort is not None:
             mango_query["sort"] = sort
 
+        if use_category_date_index:
+            self._log_category_date_explain(mango_query)
+
         docs = self._client.find(self._db, mango_query)
         return [doc_to_product(self._maybe_lazy_migrate(d)) for d in docs]
+
+    @staticmethod
+    def _uses_category_date_index(filter_dto: ProductFilterDto) -> bool:
+        """Составной индекс: одна категория и хотя бы одна граница даты."""
+        return bool(
+            filter_dto.category_ids
+            and len(filter_dto.category_ids) == 1
+            and (
+                filter_dto.created_from is not None
+                or filter_dto.created_to is not None
+            )
+        )
+
+    def _log_category_date_explain(self, mango_query: dict[str, Any]) -> None:
+        """Записать в лог индекс, который CouchDB выбирает для этого запроса."""
+        try:
+            plan = self._client.explain(self._db, mango_query)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Не удалось получить Mango _explain для поиска по категории и дате: %s",
+                exc,
+            )
+            return
+
+        index = plan.get("index") if isinstance(plan, dict) else None
+        index_name = index.get("name") if isinstance(index, dict) else None
+        logger.warning(
+            "Mango _explain поиска по категории и дате создания: index=%s selector=%s sort=%s",
+            index_name,
+            mango_query.get("selector"),
+            mango_query.get("sort"),
+        )
 
     def _resolve_v2_category_ids(
         self,

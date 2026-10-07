@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -51,6 +52,8 @@ class ProductFilterDto:
     in_stock_only: bool = False
     sort_by: ProductSortBy = ProductSortBy.POPULARITY
     category_ids: list[UUID] | None = None
+    created_from: datetime | None = None
+    created_to: datetime | None = None
     offset: int = 0
     limit: int = 50
 

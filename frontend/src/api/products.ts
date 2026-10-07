@@ -47,6 +47,8 @@ export type ProductQuery = {
   in_stock_only?: boolean;
   sort_by?: ProductSortBy;
   category_ids?: string[];
+  created_from?: string;
+  created_to?: string;
   offset?: number;
   limit?: number;
 };
@@ -66,6 +68,8 @@ export function listProducts(params: ProductQuery): Promise<ProductList> {
       search.append("category_ids", cid);
     }
   }
+  if (params.created_from) search.set("created_from", params.created_from);
+  if (params.created_to) search.set("created_to", params.created_to);
   return api<ProductList>(`/api/products?${search.toString()}`, {
     cache: "no-store",
     headers: { "Cache-Control": "no-cache" },
