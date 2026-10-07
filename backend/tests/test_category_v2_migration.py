@@ -43,6 +43,15 @@ class MockCouchDbClient:
         if db not in self.dbs:
             self.dbs[db] = {}
 
+    def resolve_conflicts_fww(
+        self,
+        db: str,
+        doc_id: str,
+        *,
+        node: int = -1,
+    ) -> dict[str, Any] | None:
+        return self.get_doc(db, doc_id)
+
     def get_doc(self, db: str, doc_id: str) -> dict[str, Any] | None:
         self.ensure_database(db)
         doc = self.dbs[db].get(doc_id)

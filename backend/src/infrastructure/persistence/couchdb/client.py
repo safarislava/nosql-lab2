@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Callable
+from datetime import UTC, datetime
 from functools import cache
 from types import TracebackType
 from typing import Any, Self
@@ -19,6 +20,19 @@ from .exceptions import (
 )
 
 logger = logging.getLogger(__name__)
+
+_CONFLICT_META = {"_conflicts", "_revisions", "_deleted_conflicts"}
+
+
+def first_write_stamp(doc: dict[str, Any]) -> str:
+    """Момент первой записи ветки. Пустое значение старше любой метки."""
+    raw = doc.get("updated_at") or doc.get("created_at") or ""
+    return str(raw)
+
+
+def select_first_write(branches: list[dict[str, Any]]) -> dict[str, Any]:
+    """Выбрать ветку с самым ранним временем записи."""
+    return min(branches, key=first_write_stamp)
 
 
 class CouchDbClient:
@@ -255,7 +269,10 @@ class CouchDbClient:
     ) -> bool:
         """Атомарно модифицировать документ с повторами при MVCC-конфликтах."""
         for _ in range(max_retries):
-            doc = self.get_doc(db, doc_id)
+            try:
+                doc = self.resolve_conflicts_fww(db, doc_id)
+            except CouchDbConflictException:
+                continue
             if doc is None:
                 if not create_if_missing:
                     return False
@@ -264,6 +281,7 @@ class CouchDbClient:
             if not mutator(doc):
                 return False
 
+            doc["updated_at"] = datetime.now(UTC).isoformat()
             try:
                 self.save_doc(db, doc)
                 return True
@@ -596,6 +614,48 @@ class CouchDbClient:
         if not doc:
             return []
         return doc.get("_conflicts", [])
+
+    def resolve_conflicts_fww(
+        self,
+        db: str,
+        doc_id: str,
+        *,
+        node: int = -1,
+    ) -> dict[str, Any] | None:
+        """Оставить ветку с самым ранним updated_at и удалить остальные."""
+        current = self.get_doc(db, doc_id, conflicts=True, node=node)
+        if current is None:
+            return None
+
+        losing_revs = [str(rev) for rev in current.get("_conflicts") or [] if rev]
+        if not losing_revs:
+            current.pop("_conflicts", None)
+            return current
+
+        branches = [current]
+        for rev in losing_revs:
+            old = self.get_doc(db, doc_id, rev=rev, node=node)
+            if old is not None:
+                branches.append(old)
+
+        chosen = select_first_write(branches)
+        winner = {
+            key: value
+            for key, value in chosen.items()
+            if key not in _CONFLICT_META
+        }
+        winner["_id"] = current["_id"]
+        winner["_rev"] = current["_rev"]
+        self.resolve_conflict(db, doc_id, winner, losing_revs, node=node)
+        logger.warning(
+            "FWW: документ '%s' в '%s', оставлена запись %s, удалены ревизии %s",
+            doc_id,
+            db,
+            first_write_stamp(chosen) or "<без метки>",
+            ", ".join(losing_revs),
+        )
+        resolved = self.get_doc(db, doc_id, node=node)
+        return resolved if resolved is not None else winner
 
     def resolve_conflict(
         self,

@@ -106,7 +106,16 @@ class CouchDbProductRepository(IProductRepository):
         return self._migrator.lazy_migrate_doc(doc)
 
     def get_by_id(self, product_id: UUID) -> Product | None:
-        doc = self._client.get_doc(self._db, str(product_id))
+        doc_id = str(product_id)
+        try:
+            doc = self._client.resolve_conflicts_fww(self._db, doc_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Не удалось разрешить конфликт FWW для товара %s: %s",
+                doc_id,
+                exc,
+            )
+            doc = self._client.get_doc(self._db, doc_id)
         if doc is None or doc.get("type") != "product":
             return None
         doc = self._maybe_lazy_migrate(doc)
