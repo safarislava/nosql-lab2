@@ -143,9 +143,7 @@ class OrderService:
         self._product_service.restore_stock(
             updated_order.product_id, updated_order.quantity
         )
-        self._product_service.decrement_orders_count(
-            updated_order.product_id, 1
-        )
+        self._product_service.decrement_orders_count(updated_order.product_id, 1)
 
         self._event_bus.publish(
             OperationEvent(
@@ -198,9 +196,7 @@ class OrderService:
         self._product_service.restore_stock(
             updated_order.product_id, updated_order.quantity
         )
-        self._product_service.decrement_orders_count(
-            updated_order.product_id, 1
-        )
+        self._product_service.decrement_orders_count(updated_order.product_id, 1)
 
         self._event_bus.publish(
             OperationEvent(

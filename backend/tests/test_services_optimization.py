@@ -52,16 +52,20 @@ class TestServicesHydration:
         assert len(cart_dto.items) == 2
 
         item_map = {item.product_id: item for item in cart_dto.items}
-        assert item_map[sample_product.id].product is not None
-        assert item_map[sample_product.id].product.name == sample_product.name
-        assert item_map[sample_product.id].product.price == Decimal("1500.00")
-        assert item_map[sample_product.id].subtotal == Decimal("3000.00")
-        assert item_map[sample_product.id].is_available is True
-        assert item_map[sample_product.id].available_stock == 10
+        first = item_map[sample_product.id]
+        first_product = first.product
+        assert first_product is not None
+        assert first_product.name == sample_product.name
+        assert first_product.price == Decimal("1500.00")
+        assert first.subtotal == Decimal("3000.00")
+        assert first.is_available is True
+        assert first.available_stock == 10
 
-        assert item_map[p2.id].product is not None
-        assert item_map[p2.id].product.price == Decimal("500.00")
-        assert item_map[p2.id].subtotal == Decimal("500.00")
+        second = item_map[p2.id]
+        second_product = second.product
+        assert second_product is not None
+        assert second_product.price == Decimal("500.00")
+        assert second.subtotal == Decimal("500.00")
 
     def test_cart_service_orphan_and_out_of_stock_products(
         self,

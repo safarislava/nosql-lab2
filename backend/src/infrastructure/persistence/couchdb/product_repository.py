@@ -219,8 +219,7 @@ class CouchDbProductRepository(IProductRepository):
             filter_dto.category_ids
             and len(filter_dto.category_ids) == 1
             and (
-                filter_dto.created_from is not None
-                or filter_dto.created_to is not None
+                filter_dto.created_from is not None or filter_dto.created_to is not None
             )
         )
 
@@ -493,7 +492,7 @@ class CouchDbProductRepository(IProductRepository):
             return None
         return self.get_by_id(product_id)
 
-    def average_changes_by_state(self) -> list[ProductStateChangesDto]:
+    def average_changes_by_state(self) -> builtins.list[ProductStateChangesDto]:
         """Среднее число правок по состояниям наличия из MapReduce-view.
 
         View читается с узла 0. Если он недоступен, клиент переключается

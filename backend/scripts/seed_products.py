@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Загрузить 20 тестовых товаров в CouchDB.
 
 Повторный запуск не создает дубликаты: уже существующий _id пропускается.
@@ -61,11 +60,15 @@ def main() -> int:
         created += 1
         print(f"создан   {product['name']}  правок={product.get('changes', 0)}")
 
-    print(f"Готово: создано {created}, уже было {skipped}, всего в наборе {len(products)}")
+    print(
+        f"Готово: создано {created}, уже было {skipped}, всего в наборе {len(products)}"
+    )
     return 0
 
 
-def _to_doc(product: dict[str, Any], categories: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def _to_doc(
+    product: dict[str, Any], categories: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
     embedded = []
     for slug in product["categories"]:
         category = categories[slug]
@@ -95,7 +98,9 @@ def _to_doc(product: dict[str, Any], categories: dict[str, dict[str, Any]]) -> d
     }
 
 
-def _get_doc(opener: urllib.request.OpenerDirector, base_url: str, db: str, doc_id: str) -> dict[str, Any] | None:
+def _get_doc(
+    opener: urllib.request.OpenerDirector, base_url: str, db: str, doc_id: str
+) -> dict[str, Any] | None:
     try:
         return _request(opener, "GET", f"{base_url}/{db}/{doc_id}")
     except urllib.error.HTTPError as exc:
@@ -117,11 +122,8 @@ def _request(
         request.add_header(header, value)
     if data is not None:
         request.add_header("Content-Type", "application/json")
-    try:
-        with opener.open(request, timeout=10) as response:
-            raw = response.read()
-    except urllib.error.HTTPError:
-        raise
+    with opener.open(request, timeout=10) as response:
+        raw = response.read()
     if not raw:
         return {}
     parsed = json.loads(raw.decode("utf-8"))

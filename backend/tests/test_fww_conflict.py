@@ -90,7 +90,12 @@ def test_resolve_conflicts_fww_keeps_earliest_branch() -> None:
 def test_resolve_conflicts_fww_without_conflicts_reads_doc() -> None:
     """Без _conflicts документ возвращается как есть и не перезаписывается."""
     client = object.__new__(CouchDbClient)
-    doc = {"_id": "p", "_rev": "1-a", "name": "один", "updated_at": "2026-01-01T00:00:00+00:00"}
+    doc = {
+        "_id": "p",
+        "_rev": "1-a",
+        "name": "один",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
 
     def get_doc(
         db: str,

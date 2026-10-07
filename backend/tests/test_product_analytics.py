@@ -60,7 +60,9 @@ class FakeRiak:
     ) -> None:
         self.props[bucket] = props
 
-    def get(self, bucket: str, key: str, bucket_type: str = "default") -> RiakObject | None:
+    def get(
+        self, bucket: str, key: str, bucket_type: str = "default"
+    ) -> RiakObject | None:
         data = self.objects.get((bucket, key))
         if data is None:
             return None
@@ -87,8 +89,8 @@ class FakeProductRepository:
 
 def test_analytics_view_is_installed_once() -> None:
     client = MockCouchDbClientWithDDoc()
-    ensure_product_analytics_view(client)
-    ensure_product_analytics_view(client)
+    ensure_product_analytics_view(client)  # type: ignore[arg-type]
+    ensure_product_analytics_view(client)  # type: ignore[arg-type]
 
     doc = client.get_design_doc(settings.couchdb.products_db, "analytics")
     assert doc is not None

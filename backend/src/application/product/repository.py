@@ -116,6 +116,6 @@ class IProductRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def average_changes_by_state(self) -> list[ProductStateChangesDto]:
+    def average_changes_by_state(self) -> builtins.list[ProductStateChangesDto]:
         """Среднее число правок товара по состояниям наличия."""
         raise NotImplementedError

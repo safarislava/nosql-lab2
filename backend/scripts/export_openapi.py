@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 # Use test container defaults if not explicitly set
 os.environ.setdefault("POSTGRES__HOST", "localhost")

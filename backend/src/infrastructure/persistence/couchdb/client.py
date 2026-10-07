@@ -220,6 +220,24 @@ class CouchDbClient:
             f"Ошибка при получении документа '{doc_id}': {resp.text}"
         )
 
+    def get_all_docs(
+        self,
+        db: str,
+        *,
+        include_docs: bool = False,
+        node: int = -1,
+    ) -> list[dict[str, Any]]:
+        """Строки `_all_docs`: id документа и value.rev."""
+        params: dict[str, str] = {}
+        if include_docs:
+            params["include_docs"] = "true"
+        path = f"/{quote(db, safe='')}/_all_docs"
+        resp = self._request("GET", path, node=node, params=params)
+        if resp.status_code == 200:
+            rows = resp.json().get("rows", [])
+            return rows if isinstance(rows, list) else []
+        raise CouchDbException(f"Ошибка чтения _all_docs базы '{db}': {resp.text}")
+
     def save_doc(
         self,
         db: str,
@@ -640,9 +658,7 @@ class CouchDbClient:
 
         chosen = select_first_write(branches)
         winner = {
-            key: value
-            for key, value in chosen.items()
-            if key not in _CONFLICT_META
+            key: value for key, value in chosen.items() if key not in _CONFLICT_META
         }
         winner["_id"] = current["_id"]
         winner["_rev"] = current["_rev"]

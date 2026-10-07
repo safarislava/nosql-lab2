@@ -1057,14 +1057,14 @@ def test_category_search_v2_and_v1_restriction() -> None:
     - в v1 поиск категорий запрещен и выбрасывает исключение CategorySearchNotSupportedInV1Exception.
     """
     mock_client = MockCouchDbClient()
-    v1_repo = CouchDbEmbeddedCategoryRepository(client=mock_client)
-    v2_repo = CouchDbReferencedCategoryRepository(client=mock_client)
-    migrator = CategoryMigrator(client=mock_client)
+    v1_repo = CouchDbEmbeddedCategoryRepository(client=mock_client)  # type: ignore[arg-type]
+    v2_repo = CouchDbReferencedCategoryRepository(client=mock_client)  # type: ignore[arg-type]
+    migrator = CategoryMigrator(client=mock_client)  # type: ignore[arg-type]
     composite_repo = CompositeCategoryRepository(
         v1_repo=v1_repo,
         v2_repo=v2_repo,
         migrator=migrator,
-        client=mock_client,
+        client=mock_client,  # type: ignore[arg-type]
     )
     service = CategoryService(category_repository=composite_repo)
 
