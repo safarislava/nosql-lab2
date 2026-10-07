@@ -8,7 +8,7 @@ from domain.attachment import AttachmentMetadata
 from domain.category import Category
 from domain.product import Product
 
-from .dto import ProductFilterDto
+from .dto import ProductFilterDto, ProductStateChangesDto
 
 
 class IProductRepository(ABC):
@@ -113,4 +113,9 @@ class IProductRepository(ABC):
         self, product_id: UUID, attachment_id: UUID
     ) -> Product | None:
         """Удалить встроенное вложение из товара."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def average_changes_by_state(self) -> list[ProductStateChangesDto]:
+        """Среднее число правок товара по состояниям наличия."""
         raise NotImplementedError

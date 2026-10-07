@@ -62,6 +62,18 @@ export type ProductList = {
   limit: number;
 };
 
+export type ProductStockState = "in_stock" | "out_of_stock";
+
+export type ProductStateChanges = {
+  state: ProductStockState;
+  average_changes: number;
+  product_count: number;
+};
+
+export type ProductAnalytics = {
+  by_state: ProductStateChanges[];
+};
+
 export type ProductSortBy =
   | "popularity"
   | "price_asc"

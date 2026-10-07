@@ -7,7 +7,12 @@ from typing import Any
 from uuid import UUID
 
 from application.category.repository import ICategoryRepository
-from application.product.dto import ProductFilterDto, ProductSortBy
+from application.product.dto import (
+    PRODUCT_STOCK_STATES,
+    ProductFilterDto,
+    ProductSortBy,
+    ProductStateChangesDto,
+)
 from application.product.exceptions import (
     ProductAlreadyExistsException,
     ProductNotFoundException,
@@ -404,3 +409,39 @@ class CouchDbProductRepository(IProductRepository):
         if not self._client.mutate_doc(self._db, str(product_id), mutator):
             return None
         return self.get_by_id(product_id)
+
+    def average_changes_by_state(self) -> list[ProductStateChangesDto]:
+        """Среднее число правок по состояниям наличия из MapReduce-view.
+
+        View читается с узла 0. Если он недоступен, клиент переключается
+        на узел 1. Ответы узлов не складываются: после репликации это
+        одни и те же документы.
+        """
+        rows = self._client.query_view(
+            self._db,
+            "analytics",
+            "changes_by_state",
+            group=True,
+        )
+        by_state = {
+            state: ProductStateChangesDto(
+                state=state,
+                average_changes=0.0,
+                product_count=0,
+            )
+            for state in PRODUCT_STOCK_STATES
+        }
+        for row in rows:
+            state = row.get("key")
+            value = row.get("value")
+            if state not in by_state or not isinstance(value, dict):
+                continue
+            product_count = int(value.get("count") or 0)
+            total_changes = float(value.get("sum") or 0)
+            average = total_changes / product_count if product_count else 0.0
+            by_state[str(state)] = ProductStateChangesDto(
+                state=str(state),
+                average_changes=average,
+                product_count=product_count,
+            )
+        return [by_state[state] for state in PRODUCT_STOCK_STATES]

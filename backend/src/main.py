@@ -31,6 +31,7 @@ from infrastructure.http.product.category.controller import (
     router as product_categories_router,
 )
 from infrastructure.http.product.controller import router as product_router
+from infrastructure.http.product.dependencies import get_product_analytics_cache
 from infrastructure.http.recovery.controller import router as recovery_router
 from infrastructure.http.teacher.controller import router as teacher_router
 from infrastructure.http.user.controller import router as user_router
@@ -43,6 +44,7 @@ from infrastructure.persistence.couchdb.client import (
 )
 from infrastructure.persistence.couchdb.design_documents import (
     ensure_category_indexes,
+    ensure_product_analytics_view,
     ensure_product_indexes,
     ensure_validation_design_docs,
 )
@@ -57,6 +59,7 @@ def _run_couchdb_init_and_migration() -> None:
         client = CouchDbClient()
         client.ensure_system_databases()
         ensure_validation_design_docs(client)
+        ensure_product_analytics_view(client)
         ensure_product_indexes(client)
         ensure_category_indexes(client)
         client.setup_two_way_replication(settings.couchdb.products_db)
@@ -90,6 +93,7 @@ def _run_couchdb_init_and_migration() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     init_db()
+    get_product_analytics_cache()
     asyncio.create_task(asyncio.to_thread(_run_couchdb_init_and_migration))
     yield
     close_postgres_pool()

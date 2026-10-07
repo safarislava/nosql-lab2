@@ -6,6 +6,7 @@ import type {
   Product,
   ProductAttachmentInput,
   ProductCategoryInput,
+  ProductAnalytics,
   ProductList,
   ProductSortBy,
 } from "./types";
@@ -214,4 +215,8 @@ export function restoreStock(productId: string, amount: number): Promise<Product
     method: "POST",
     body: JSON.stringify({ amount }),
   });
+}
+
+export function getProductAnalytics(): Promise<ProductAnalytics> {
+  return api<ProductAnalytics>("/api/products/analytics");
 }

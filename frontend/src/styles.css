@@ -517,10 +517,27 @@ p {
   font-size: 14px;
 }
 
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.analytics-card {
+  padding: 20px;
+}
+
+.analytics-card__value {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: 28px;
+}
+
 @media (max-width: 900px) {
   .grid,
   .filters,
-  .create-product {
+  .create-product,
+  .analytics-grid {
     grid-template-columns: 1fr;
   }
 

@@ -94,3 +94,17 @@ class ProductListResponseDto:
     items: list[ProductResponseDto]
     offset: int
     limit: int
+
+
+IN_STOCK_STATE = "in_stock"
+OUT_OF_STOCK_STATE = "out_of_stock"
+PRODUCT_STOCK_STATES = (IN_STOCK_STATE, OUT_OF_STOCK_STATE)
+
+
+@dataclass(frozen=True)
+class ProductStateChangesDto:
+    """Среднее число правок товаров в одном состоянии наличия."""
+
+    state: str
+    average_changes: float
+    product_count: int

@@ -14,6 +14,7 @@ from infrastructure.http.middleware.authentication_middleware import (
 )
 from infrastructure.http.product.schemas import (
     CreateProductRequest,
+    ProductAnalyticsResponse,
     ProductListResponse,
     ProductResponse,
     StockOperationRequest,
@@ -78,6 +79,17 @@ def list_products(
     )
     result = service.list(filter_dto)
     return ProductListResponse.from_dto(result)
+
+
+@router.get(
+    "/analytics",
+    dependencies=[require_roles(UserRole.ADMIN)],
+    response_model=ProductAnalyticsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Среднее количество изменений товара по состояниям наличия",
+)
+def get_product_analytics(service: ProductServiceDep) -> ProductAnalyticsResponse:
+    return ProductAnalyticsResponse.from_stats(service.average_changes_by_state())
 
 
 @router.post(

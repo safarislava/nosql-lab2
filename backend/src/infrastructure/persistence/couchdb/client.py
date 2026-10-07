@@ -27,6 +27,7 @@ class CouchDbClient:
     def __init__(self) -> None:
         self.nodes: list[str] = [url.rstrip("/") for url in settings.couchdb.nodes]
         self.timeout = settings.couchdb.timeout
+        self._products_changed_listeners: list[Callable[[], None]] = []
         self._clients: dict[str, httpx.Client] = {
             url: httpx.Client(
                 base_url=url,
@@ -52,6 +53,24 @@ class CouchDbClient:
         exc_tb: TracebackType | None,
     ) -> None:
         self.close()
+
+    def add_products_changed_listener(self, listener: Callable[[], None]) -> None:
+        """Подписать сброс кэша на успешную запись или удаление товара."""
+        if listener not in self._products_changed_listeners:
+            self._products_changed_listeners.append(listener)
+
+    def _notify_products_changed(self, db: str, doc_id: str) -> None:
+        if db != settings.couchdb.products_db or doc_id.startswith("_design/"):
+            return
+        for listener in tuple(self._products_changed_listeners):
+            try:
+                listener()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Не удалось обработать изменение товара '%s': %s",
+                    doc_id,
+                    exc,
+                )
 
     def get_node_for_doc(self, doc_id: str) -> int:
         """Целевой узел для doc_id: hash(doc_id) % len(nodes) -> 0 или 1."""
@@ -212,7 +231,10 @@ class CouchDbClient:
             resp = self._request("POST", path, node=node, json=doc, params=params)
 
         if resp.status_code in (200, 201, 202):
-            return resp.json()
+            body = resp.json()
+            saved_id = str(body.get("id") or doc_id)
+            self._notify_products_changed(db, saved_id)
+            return body
 
         if resp.status_code == 409:
             raise CouchDbConflictException(doc_id or "unknown", resp.text)
@@ -267,6 +289,7 @@ class CouchDbClient:
         )
 
         if resp.status_code in (200, 202):
+            self._notify_products_changed(db, doc_id)
             return True
         if resp.status_code == 404:
             return False

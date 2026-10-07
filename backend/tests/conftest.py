@@ -241,6 +241,7 @@ def _cleanup_riak() -> None:
             ("maps", "favourites"),
             ("counters", "order_counters"),
             ("default", "history_cache"),
+            ("default", "product_analytics"),
         ]
         for btype, bname in buckets_to_clean:
             try:
