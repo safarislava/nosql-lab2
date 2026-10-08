@@ -74,6 +74,16 @@ def _created_at_upper_iso(value: datetime) -> str:
     return value.isoformat()
 
 
+def _created_at_bounds(filter_dto: ProductFilterDto) -> dict[str, str]:
+    """Границы created_at. Пустой словарь, если даты не заданы."""
+    created_at: dict[str, str] = {}
+    if filter_dto.created_from is not None:
+        created_at["$gte"] = _created_at_lower_iso(filter_dto.created_from)
+    if filter_dto.created_to is not None:
+        created_at["$lt"] = _created_at_upper_iso(filter_dto.created_to)
+    return created_at
+
+
 class CouchDbProductRepository(IProductRepository):
     """Репозиторий товаров CouchDB."""
 
@@ -160,43 +170,46 @@ class CouchDbProductRepository(IProductRepository):
                 q = re.escape(filter_dto.query.strip())
                 selector["name"] = {"$regex": f"(?i){q}"}
 
-            use_category_date_index = self._uses_category_date_index(filter_dto)
-            if use_category_date_index:
-                category_ids = filter_dto.category_ids or []
-                selector["category_ids"] = {"$eq": str(category_ids[0])}
-                created_at: dict[str, str] = {}
-                if filter_dto.created_from is not None:
-                    created_at["$gte"] = _created_at_lower_iso(filter_dto.created_from)
-                if filter_dto.created_to is not None:
-                    created_at["$lt"] = _created_at_upper_iso(filter_dto.created_to)
-                selector["created_at"] = created_at
-                sort = [{"category_ids": "asc"}, {"created_at": "asc"}]
-            elif filter_dto.category_ids:
+            created_at_bounds = _created_at_bounds(filter_dto)
+            if created_at_bounds:
+                selector["created_at"] = created_at_bounds
+
+            if filter_dto.category_ids:
                 cat_ids = [str(cid) for cid in filter_dto.category_ids]
                 selector["$or"] = [
                     {"category_ids": {"$in": cat_ids}},
                     {"categories": {"$elemMatch": {"id": {"$in": cat_ids}}}},
                 ]
 
-            if not use_category_date_index:
-                if filter_dto.sort_by == ProductSortBy.POPULARITY:
-                    selector.setdefault("orders_count", {})["$gte"] = 0
-                    sort = [{"orders_count": "desc"}]
-                elif filter_dto.sort_by == ProductSortBy.PRICE_ASC:
-                    selector.setdefault("price", {})["$gte"] = 0
-                    sort = [{"price": "asc"}]
-                elif filter_dto.sort_by == ProductSortBy.PRICE_DESC:
-                    selector.setdefault("price", {})["$gte"] = 0
-                    sort = [{"price": "desc"}]
-                elif filter_dto.sort_by == ProductSortBy.NAME_ASC:
-                    selector.setdefault("name", {})["$gt"] = None
-                    sort = [{"name": "asc"}]
-                elif filter_dto.sort_by == ProductSortBy.NAME_DESC:
-                    selector.setdefault("name", {})["$gt"] = None
-                    sort = [{"name": "desc"}]
-                elif filter_dto.sort_by == ProductSortBy.NEWEST:
-                    selector.setdefault("created_at", {})["$gt"] = None
-                    sort = [{"created_at": "desc"}]
+            use_category_date_index = self._uses_category_date_index(filter_dto)
+
+            if filter_dto.sort_by == ProductSortBy.POPULARITY:
+                selector.setdefault("orders_count", {}).setdefault("$gte", 0)
+                sort = [{"orders_count": "desc"}]
+            elif filter_dto.sort_by == ProductSortBy.PRICE_ASC:
+                selector.setdefault("price", {}).setdefault("$gte", 0)
+                sort = [{"price": "asc"}]
+            elif filter_dto.sort_by == ProductSortBy.PRICE_DESC:
+                selector.setdefault("price", {}).setdefault("$gte", 0)
+                sort = [{"price": "desc"}]
+            elif filter_dto.sort_by == ProductSortBy.NAME_ASC:
+                if not (
+                    isinstance(selector.get("name"), dict)
+                    and "$regex" in selector["name"]
+                ):
+                    selector.setdefault("name", {}).setdefault("$gt", None)
+                sort = [{"name": "asc"}]
+            elif filter_dto.sort_by == ProductSortBy.NAME_DESC:
+                if not (
+                    isinstance(selector.get("name"), dict)
+                    and "$regex" in selector["name"]
+                ):
+                    selector.setdefault("name", {}).setdefault("$gt", None)
+                sort = [{"name": "desc"}]
+            elif filter_dto.sort_by == ProductSortBy.NEWEST:
+                if "created_at" not in selector:
+                    selector["created_at"] = {"$gt": None}
+                sort = [{"created_at": "desc"}]
 
         mango_query: dict[str, Any] = {
             "selector": selector,
@@ -206,8 +219,10 @@ class CouchDbProductRepository(IProductRepository):
         if sort is not None:
             mango_query["sort"] = sort
 
-        if use_category_date_index:
-            self._log_category_date_explain(mango_query)
+        if filter_dto is not None and use_category_date_index:
+            self._log_category_date_explain(
+                self._category_date_index_query(filter_dto, selector, limit, skip)
+            )
 
         docs = self._client.find(self._db, mango_query)
         return [doc_to_product(self._maybe_lazy_migrate(d)) for d in docs]
@@ -222,6 +237,27 @@ class CouchDbProductRepository(IProductRepository):
                 filter_dto.created_from is not None or filter_dto.created_to is not None
             )
         )
+
+    @staticmethod
+    def _category_date_index_query(
+        filter_dto: ProductFilterDto,
+        selector: dict[str, Any],
+        limit: int,
+        skip: int,
+    ) -> dict[str, Any]:
+        """Селектор, по которому CouchDB выбирает составной индекс категории и даты."""
+        category_ids = filter_dto.category_ids or []
+        explain_selector: dict[str, Any] = {"type": "product"}
+        for key in ("price", "quantity", "name", "created_at"):
+            if key in selector:
+                explain_selector[key] = selector[key]
+        explain_selector["category_ids"] = {"$eq": str(category_ids[0])}
+        return {
+            "selector": explain_selector,
+            "limit": limit,
+            "skip": skip,
+            "sort": [{"category_ids": "asc"}, {"created_at": "asc"}],
+        }
 
     def _log_category_date_explain(self, mango_query: dict[str, Any]) -> None:
         """Записать в лог индекс, который CouchDB выбирает для этого запроса."""

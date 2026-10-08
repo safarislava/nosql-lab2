@@ -146,12 +146,26 @@ class MockCouchDbClient:
                     all(match_predicate(doc, sk, sv) for sk, sv in sub.items())
                     for sub in v
                 )
+            if k == "created_at" and isinstance(v, dict):
+                raw = doc.get("created_at")
+                if raw is None:
+                    return False
+                text = str(raw)
+                if "$gte" in v and text < str(v["$gte"]):
+                    return False
+                if "$gt" in v and v["$gt"] is not None and text <= str(v["$gt"]):
+                    return False
+                if "$lt" in v and text >= str(v["$lt"]):
+                    return False
+                return not ("$lte" in v and text > str(v["$lte"]))
             if k == "category_ids" and isinstance(v, dict):
                 cids = [str(c) for c in doc.get("category_ids", [])]
                 if "$all" in v:
                     return all(str(item) in cids for item in v["$all"])
                 if "$in" in v:
                     return any(str(item) in cids for item in v["$in"])
+                if "$eq" in v:
+                    return str(v["$eq"]) in cids
             if k == "categories" and isinstance(v, dict):
                 cats = doc.get("categories", [])
                 if "$elemMatch" in v:
@@ -1132,17 +1146,76 @@ def test_category_search_v2_and_v1_restriction() -> None:
 
 
 def test_product_list_category_and_created_at_uses_composite_index() -> None:
-    """Одна категория и диапазон дат строят селектор составного индекса."""
+    """Дата фильтрует обе схемы, а _explain для одной категории смотрит составной индекс."""
     from datetime import datetime
 
     mock_client = MockCouchDbClient()
-    settings.app_version = 2
+    settings.app_version = 1
     repo = CouchDbProductRepository(client=mock_client)  # type: ignore[arg-type]
 
     category_id = uuid4()
+    other_category_id = uuid4()
     created_from = datetime(2026, 1, 1, tzinfo=UTC)
     created_to = datetime(2026, 2, 1, tzinfo=UTC)
-    repo.list(
+    created_at_bounds = {
+        "$gte": created_from.isoformat(),
+        "$lt": datetime(2026, 2, 2, tzinfo=UTC).isoformat(),
+    }
+    products_db = settings.couchdb.products_db
+    v1_id = uuid4()
+    v2_id = uuid4()
+    late_id = uuid4()
+    mock_client.save_doc(
+        products_db,
+        {
+            "_id": str(v1_id),
+            "type": "product",
+            "name": "Вложенная категория",
+            "price": 10,
+            "quantity": 1,
+            "created_at": "2026-01-15T00:00:00+00:00",
+            "categories": [{"id": str(category_id), "name": "Электроника"}],
+        },
+    )
+    mock_client.save_doc(
+        products_db,
+        {
+            "_id": str(v2_id),
+            "type": "product",
+            "name": "Ссылка на категорию",
+            "price": 20,
+            "quantity": 1,
+            "created_at": "2026-01-20T00:00:00+00:00",
+            "schema_version": 2,
+            "category_ids": [str(category_id)],
+        },
+    )
+    mock_client.save_doc(
+        products_db,
+        {
+            "_id": str(late_id),
+            "type": "product",
+            "name": "Слишком поздний",
+            "price": 30,
+            "quantity": 1,
+            "created_at": "2026-03-01T00:00:00+00:00",
+            "categories": [{"id": str(category_id), "name": "Электроника"}],
+        },
+    )
+    mock_client.save_doc(
+        products_db,
+        {
+            "_id": str(uuid4()),
+            "type": "product",
+            "name": "Другая категория",
+            "price": 40,
+            "quantity": 1,
+            "created_at": "2026-01-10T00:00:00+00:00",
+            "category_ids": [str(other_category_id)],
+        },
+    )
+
+    found = repo.list(
         ProductFilterDto(
             category_ids=[category_id],
             created_from=created_from,
@@ -1150,28 +1223,54 @@ def test_product_list_category_and_created_at_uses_composite_index() -> None:
             sort_by=ProductSortBy.PRICE_ASC,
         )
     )
+    assert {item.name for item in found} == {
+        "Вложенная категория",
+        "Ссылка на категорию",
+    }
 
     selector = mock_client.last_query["selector"]
-    assert selector["category_ids"] == {"$eq": str(category_id)}
-    assert selector["created_at"] == {
-        "$gte": created_from.isoformat(),
-        "$lt": datetime(2026, 2, 2, tzinfo=UTC).isoformat(),
-    }
-    assert "$or" not in selector
-    assert "price" not in selector
-    assert mock_client.last_query["sort"] == [
+    assert selector["created_at"] == created_at_bounds
+    assert selector["$or"] == [
+        {"category_ids": {"$in": [str(category_id)]}},
+        {"categories": {"$elemMatch": {"id": {"$in": [str(category_id)]}}}},
+    ]
+    assert mock_client.last_query["sort"] == [{"price": "asc"}]
+
+    explain_query = mock_client.last_explain["query"]
+    assert explain_query["selector"]["category_ids"] == {"$eq": str(category_id)}
+    assert explain_query["selector"]["created_at"] == created_at_bounds
+    assert "$or" not in explain_query["selector"]
+    assert explain_query["sort"] == [
         {"category_ids": "asc"},
         {"created_at": "asc"},
     ]
-    assert mock_client.last_explain["query"] == mock_client.last_query
 
     repo.list(
         ProductFilterDto(
-            category_ids=[category_id, uuid4()],
+            category_ids=[category_id, other_category_id],
             created_from=created_from,
         )
     )
-    assert "$or" in mock_client.last_query["selector"]
+    several = mock_client.last_query["selector"]
+    assert several["created_at"]["$gte"] == created_from.isoformat()
+    assert several["$or"][0]["category_ids"]["$in"] == [
+        str(category_id),
+        str(other_category_id),
+    ]
+
+    repo.list(
+        ProductFilterDto(
+            created_from=created_from,
+            created_to=created_to,
+            sort_by=ProductSortBy.NEWEST,
+        )
+    )
+    dates_only = mock_client.last_query["selector"]
+    assert dates_only["created_at"] == created_at_bounds
+    assert "$or" not in dates_only
+    assert mock_client.last_explain["query"]["selector"]["category_ids"] == {
+        "$eq": str(category_id)
+    }
 
 
 if __name__ == "__main__":
